@@ -1,0 +1,187 @@
+import { useRef, useMemo, useEffect, useState } from 'react';
+import { useStore } from '@/stores';
+import { HEADER_HEIGHT, ROW_HEIGHT } from '@/constants/timeline';
+import { getTotalMonths } from '@/utils/timeline';
+import { TimelineHeader } from '@/components/Timeline/TimelineHeader';
+import { TimelineGrid } from '@/components/Timeline/TimelineGrid';
+import { TimelineBody } from '@/components/Timeline/TimelineBody';
+import { TodayMarker } from '@/components/Timeline/TodayMarker';
+import { Sidebar } from '@/components/Sidebar/Sidebar';
+import { useDragCreate } from '@/hooks/useDragCreate';
+import { useDragMove } from '@/hooks/useDragMove';
+import { useDragResize } from '@/hooks/useDragResize';
+import { useDragRowSpan } from '@/hooks/useDragRowSpan';
+import { useDragConnect } from '@/hooks/useDragConnect';
+import { useResizeSidebar } from '@/hooks/useResizeSidebar';
+import { DependencyLayer } from '@/components/DependencyArrows/DependencyLayer';
+import { Plus } from 'lucide-react';
+
+export type RowLayout = {
+  rowId: string;
+  activityIds: string[];
+  y: number;
+  mergedWithNext?: boolean;
+};
+
+export function GanttChart() {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sidebarWidth = useStore((s) => s.sidebarWidth);
+  const monthWidth = useStore((s) => s.monthWidth);
+  const startYear = useStore((s) => s.chart.startYear);
+  const startMonth = useStore((s) => s.chart.startMonth);
+  const endYear = useStore((s) => s.chart.endYear);
+  const endMonth = useStore((s) => s.chart.endMonth);
+  const chartRows = useStore((s) => s.chart.rows);
+  const addRow = useStore((s) => s.addRow);
+  const setEffectiveMonthWidth = useStore((s) => s.setEffectiveMonthWidth);
+
+  const dragCreate = useDragCreate();
+  const dragMove = useDragMove();
+  const dragResize = useDragResize();
+  const dragRowSpan = useDragRowSpan();
+  const resizeSidebar = useResizeSidebar();
+
+  const totalMonths = getTotalMonths(startYear, endYear, startMonth, endMonth);
+
+  // Track container width for adaptive zoom
+  const [containerWidth, setContainerWidth] = useState(window.innerWidth);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setContainerWidth(el.clientWidth);
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Compute effective month width: ensure chart fills viewport
+  const availableWidth = containerWidth - sidebarWidth;
+  const fitWidth = availableWidth / totalMonths;
+  const effectiveMonthWidth = Math.max(monthWidth, fitWidth);
+
+  useEffect(() => {
+    setEffectiveMonthWidth(effectiveMonthWidth);
+  }, [effectiveMonthWidth, setEffectiveMonthWidth]);
+
+  const timelineWidth = totalMonths * effectiveMonthWidth;
+
+  const rowLayout = useMemo(() => {
+    const rows: RowLayout[] = [];
+    let y = 0;
+    const sorted = [...chartRows].sort((a, b) => a.order - b.order);
+    for (const row of sorted) {
+      rows.push({
+        rowId: row.id,
+        activityIds: row.activityIds,
+        y,
+        mergedWithNext: row.mergedWithNext,
+      });
+      y += ROW_HEIGHT;
+    }
+    return { rows, totalHeight: y };
+  }, [chartRows]);
+
+  const dependencyMode = useStore((s) => s.dependencyMode);
+  const dragConnect = useDragConnect(rowLayout.rows, effectiveMonthWidth);
+
+  const bodyHeight = Math.max(rowLayout.totalHeight, 300);
+  const hasRows = chartRows.length > 0;
+
+  return (
+    <div
+      ref={scrollRef}
+      data-gantt-scroll
+      className="h-full overflow-auto"
+    >
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: `${sidebarWidth}px ${timelineWidth}px`,
+          gridTemplateRows: `${HEADER_HEIGHT}px ${bodyHeight}px`,
+        }}
+      >
+        {/* Top-left corner: sticky top + left */}
+        <div
+          className="sticky left-0 top-0 z-30 border-b border-r bg-background"
+          style={{ width: sidebarWidth, height: HEADER_HEIGHT }}
+        />
+
+        {/* Timeline header: sticky top */}
+        <div className="sticky top-0 z-20">
+          <TimelineHeader
+            startYear={startYear}
+            endYear={endYear}
+            chartStartMonth={startMonth}
+            chartEndMonth={endMonth}
+            monthWidth={effectiveMonthWidth}
+            totalWidth={timelineWidth}
+          />
+        </div>
+
+        {/* Sidebar: sticky left */}
+        <div
+          className="sticky left-0 z-10 border-r bg-background"
+          onDoubleClick={(e) => {
+            // Double-click on empty sidebar area adds a new row
+            if (!(e.target as HTMLElement).closest('[data-sidebar-row]')) {
+              addRow();
+            }
+          }}
+        >
+          <Sidebar
+            rows={rowLayout.rows}
+            sidebarWidth={sidebarWidth}
+            onResizeMouseDown={resizeSidebar.onMouseDown}
+          />
+        </div>
+
+        {/* Timeline body */}
+        <div className="relative" data-timeline-body style={{ height: bodyHeight }}>
+          <TimelineGrid
+            totalMonths={totalMonths}
+            monthWidth={effectiveMonthWidth}
+            rows={rowLayout.rows}
+            totalHeight={bodyHeight}
+            chartStartMonth={startMonth}
+          />
+          <TodayMarker startYear={startYear} chartStartMonth={startMonth} monthWidth={effectiveMonthWidth} totalHeight={rowLayout.totalHeight} />
+          <TimelineBody
+            rows={rowLayout.rows}
+            monthWidth={effectiveMonthWidth}
+            sidebarWidth={sidebarWidth}
+            dragCreate={dragCreate}
+            dragMove={dragMove}
+            dragResize={dragResize}
+            dragRowSpan={dragRowSpan}
+            onAnchorMouseDown={dependencyMode ? dragConnect.onAnchorMouseDown : undefined}
+          />
+          {dependencyMode && (
+            <DependencyLayer
+              rows={rowLayout.rows}
+              monthWidth={effectiveMonthWidth}
+              timelineWidth={timelineWidth}
+              bodyHeight={bodyHeight}
+              dragConnect={dragConnect.dragState}
+            />
+          )}
+
+          {/* Empty state */}
+          {!hasRows && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="pointer-events-auto text-center text-muted-foreground">
+                <Plus className="mx-auto mb-2 h-8 w-8 opacity-40" />
+                <p className="text-sm">Add a row to get started</p>
+                <p className="text-xs opacity-60">Use the + button in the toolbar</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
