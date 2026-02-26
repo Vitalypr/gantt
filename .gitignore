@@ -19,8 +19,8 @@ dist-ssr
 # Windows reserved names
 nul
 
-# Duplicate root-level assets (served from public/)
-/easter_egg.jpg
+# Vite cache
+.vite/
 
 # Editor directories and files
 .vscode/*
