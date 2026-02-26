@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:exe": "pnpm build && pkg --config package.json launcher/server.cjs --targets node22-win-x64 --output dist-exe/GanttChart.exe --compress GZip",
-    "deploy": "pnpm build && npx gh-pages -d dist"
+    "deploy:gh": "pnpm run build && npx gh-pages -d dist"
   },
   "pkg": {
     "assets": [
