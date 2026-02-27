@@ -1,10 +1,15 @@
-import { useRef, useState, useEffect } from 'react';
-import { Diamond, Palette, Pencil, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Diamond, MessageSquareText, Palette, Pencil, Trash2 } from 'lucide-react';
 import type { Activity, AnchorSide } from '@/types/gantt';
+import { ANCHOR_SIDES } from '@/types/gantt';
+import { EDGE_THRESHOLD } from '@/constants/timeline';
 import { useStore } from '@/stores';
 import { cn } from '@/lib/utils';
 import { isColorDark } from '@/utils/color';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
+import { useInlineEdit } from '@/hooks/useInlineEdit';
 import { ColorPicker } from './ColorPicker';
+import { AnnotationPopover } from './AnnotationPopover';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -25,11 +30,12 @@ type ActivityBarProps = {
   resizeOverride: { currentStartMonth: number; currentDuration: number } | null;
   rowSpan: number;
   rowSpanOverride: number | null;
+  topOffsetOverride: number | null;
   onSelect: () => void;
   onDoubleClick: () => void;
   onDragMoveStart: (e: React.PointerEvent) => void;
   onDragResizeStart: (e: React.PointerEvent, edge: 'left' | 'right') => void;
-  onDragRowSpanStart: (e: React.PointerEvent) => void;
+  onDragRowSpanStart: (e: React.PointerEvent, direction: 'top' | 'bottom') => void;
   onAnchorPointerDown?: (e: React.PointerEvent, activityId: string, side: AnchorSide, anchorPoint: { x: number; y: number }) => void;
 };
 
@@ -42,6 +48,7 @@ export function ActivityBar({
   resizeOverride,
   rowSpan,
   rowSpanOverride,
+  topOffsetOverride,
   onSelect,
   onDoubleClick,
   onDragMoveStart,
@@ -54,45 +61,17 @@ export function ActivityBar({
   const selectActivity = useStore((s) => s.selectActivity);
   const setEditingActivity = useStore((s) => s.setEditingActivity);
 
-  const inputRef = useRef<HTMLInputElement>(null);
-  const committedRef = useRef(false);
-  const [editValue, setEditValue] = useState(activity.name);
-  const lastTapRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
+  const { inputRef, editValue, setEditValue, commitEdit, handleEditKeyDown } = useInlineEdit(activity.id, activity.name, isEditing);
+  const checkDoubleTap = useDoubleTap();
+
+  const [annotationOpen, setAnnotationOpen] = useState(false);
+  const hasAnnotation = !!activity.annotation;
 
   const startMonth = moveOverride?.currentStartMonth ?? resizeOverride?.currentStartMonth ?? activity.startMonth;
   const duration = resizeOverride?.currentDuration ?? activity.durationMonths;
 
   const left = startMonth * monthWidth;
   const width = duration * monthWidth;
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      committedRef.current = false;
-      setEditValue(activity.name);
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [isEditing, activity.name]);
-
-  const commitEdit = () => {
-    if (committedRef.current) return;
-    committedRef.current = true;
-    const trimmed = editValue.trim();
-    if (trimmed && trimmed !== activity.name) {
-      updateActivity(activity.id, { name: trimmed });
-    }
-    setEditingActivity(null);
-  };
-
-  const handleEditKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commitEdit();
-    } else if (e.key === 'Escape') {
-      committedRef.current = true;
-      setEditingActivity(null);
-    }
-  };
 
   const handleDelete = () => {
     removeActivity(activity.id);
@@ -113,7 +92,9 @@ export function ActivityBar({
   const isDark = isColorDark(activity.color);
   const effectiveRowSpan = rowSpanOverride ?? rowSpan;
   const isSpanning = effectiveRowSpan > 1;
-  const heightStyle = isSpanning ? 'calc(200% - 8px)' : 'calc(100% - 8px)';
+  const heightStyle = `calc(${effectiveRowSpan * 100}% - 8px)`;
+  const topOffset = topOffsetOverride ?? 0;
+  const topStyle = topOffset > 0 ? `calc(4px - ${topOffset * 100}%)` : '4px';
 
   return (
     <ContextMenu>
@@ -121,11 +102,12 @@ export function ActivityBar({
         <div
           data-activity-bar
           className={cn(
-            'activity-bar group absolute top-1 flex cursor-grab items-center rounded-md',
+            'activity-bar group absolute flex cursor-grab items-center rounded-md',
             isSelected && 'activity-bar--selected ring-2 ring-ring ring-offset-1',
           )}
           style={{
             left,
+            top: topStyle,
             width: Math.max(width, monthWidth * 0.5),
             height: heightStyle,
             backgroundColor: activity.color,
@@ -142,34 +124,47 @@ export function ActivityBar({
             if (e.button !== 0) return;
 
             // Double-tap detection (touch devices don't fire dblclick)
-            const now = Date.now();
-            const last = lastTapRef.current;
-            if (now - last.time < 300 && Math.abs(e.clientX - last.x) < 25 && Math.abs(e.clientY - last.y) < 25) {
-              lastTapRef.current = { time: 0, x: 0, y: 0 };
+            if (checkDoubleTap(e)) {
               e.stopPropagation();
               onDoubleClick();
               return;
             }
-            lastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
 
             const rect = e.currentTarget.getBoundingClientRect();
             const relX = e.clientX - rect.left;
             const relY = e.clientY - rect.top;
-            const edgeThreshold = 12;
-            // Bottom edge triggers row span drag
-            if (relY > rect.height - edgeThreshold) {
-              onDragRowSpanStart(e);
+            // Top edge triggers row span drag (upward)
+            if (relY < EDGE_THRESHOLD) {
+              onDragRowSpanStart(e, 'top');
               return;
             }
-            if (relX < edgeThreshold) {
+            // Bottom edge triggers row span drag (downward)
+            if (relY > rect.height - EDGE_THRESHOLD) {
+              onDragRowSpanStart(e, 'bottom');
+              return;
+            }
+            if (relX < EDGE_THRESHOLD) {
               onDragResizeStart(e, 'left');
-            } else if (relX > rect.width - edgeThreshold) {
+            } else if (relX > rect.width - EDGE_THRESHOLD) {
               onDragResizeStart(e, 'right');
             } else {
               onDragMoveStart(e);
             }
           }}
         >
+          {/* Top resize handle for row span */}
+          <div className="resize-handle resize-handle--top" />
+
+          {/* Annotation icon + popover */}
+          <AnnotationPopover
+            activityId={activity.id}
+            annotation={activity.annotation}
+            isEditing={isEditing}
+            isOpen={annotationOpen}
+            onOpenChange={setAnnotationOpen}
+            iconColorStyle={{ color: isDark ? '#ffffff' : '#0f172a' }}
+          />
+
           {/* Left resize handle */}
           <div className="resize-handle resize-handle--left" />
 
@@ -189,7 +184,7 @@ export function ActivityBar({
               <span
                 className={cn(
                   'block text-center text-[10px] font-medium leading-tight',
-                  isSpanning ? 'line-clamp-4' : 'line-clamp-2',
+                  effectiveRowSpan >= 3 ? '' : isSpanning ? 'line-clamp-4' : 'line-clamp-2',
                 )}
                 style={{
                   color: isDark ? '#ffffff' : '#0f172a',
@@ -220,7 +215,7 @@ export function ActivityBar({
           {/* Anchor dots for dependency connections */}
           {onAnchorPointerDown && (
             <>
-              {(['left', 'right', 'top', 'bottom'] as const).map((side) => (
+              {ANCHOR_SIDES.map((side) => (
                 <div
                   key={side}
                   className="anchor-dot"
@@ -267,6 +262,10 @@ export function ActivityBar({
         >
           <Pencil className="mr-2 h-3.5 w-3.5" />
           Rename
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => setAnnotationOpen(true)}>
+          <MessageSquareText className="mr-2 h-3.5 w-3.5" />
+          {hasAnnotation ? 'Edit Annotation' : 'Add Annotation'}
         </ContextMenuItem>
         <ContextMenuSub>
           <ContextMenuSubTrigger>

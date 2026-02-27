@@ -1,10 +1,9 @@
 import { useCallback, useRef, useState } from 'react';
 import { useStore } from '@/stores';
 import { DEFAULT_ACTIVITY_COLOR } from '@/constants/colors';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 
 const DRAG_THRESHOLD = 20;
-const DOUBLE_TAP_DELAY = 300; // ms
-const DOUBLE_TAP_DISTANCE = 30; // px
 
 type DragCreateState = {
   rowId: string;
@@ -18,7 +17,7 @@ export function useDragCreate() {
   const setEditingActivity = useStore((s) => s.setEditingActivity);
   const [dragState, setDragState] = useState<DragCreateState>(null);
 
-  const lastTapRef = useRef<{ time: number; rowId: string; x: number }>({ time: 0, rowId: '', x: 0 });
+  const checkDoubleTap = useDoubleTap();
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
 
@@ -44,22 +43,12 @@ export function useDragCreate() {
 
       const relativeX = e.clientX - timelineLeftOffset;
       const startMonth = Math.max(0, Math.floor(relativeX / monthWidth));
-      const now = Date.now();
 
-      // Double-tap detection
-      const last = lastTapRef.current;
-      const isDoubleTap =
-        now - last.time < DOUBLE_TAP_DELAY &&
-        last.rowId === rowId &&
-        Math.abs(e.clientX - last.x) < DOUBLE_TAP_DISTANCE;
-
-      if (isDoubleTap) {
-        lastTapRef.current = { time: 0, rowId: '', x: 0 };
+      // Double-tap detection (key = rowId so taps on different rows don't pair)
+      if (checkDoubleTap(e, rowId)) {
         createActivity(startMonth, 1, rowId);
         return;
       }
-
-      lastTapRef.current = { time: now, rowId, x: e.clientX };
 
       startXRef.current = e.clientX;
       isDraggingRef.current = false;

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import type { AnchorSide } from '@/types/gantt';
+import { ANCHOR_SIDES, type AnchorSide } from '@/types/gantt';
 import { useStore } from '@/stores';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { getActivityRect, getAnchorPoint } from '@/utils/dependencyRouting';
@@ -19,7 +19,6 @@ export type DragConnectState = {
 } | null;
 
 const SNAP_DISTANCE = 20;
-const ANCHOR_SIDES: AnchorSide[] = ['left', 'right', 'top', 'bottom'];
 
 export function useDragConnect(rows: RowLayout[], monthWidth: number) {
   const [dragState, setDragState] = useState<DragConnectState>(null);

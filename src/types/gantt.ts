@@ -1,4 +1,4 @@
-const ANCHOR_SIDES = ['left', 'right', 'top', 'bottom'] as const;
+export const ANCHOR_SIDES = ['left', 'right', 'top', 'bottom'] as const;
 export type AnchorSide = (typeof ANCHOR_SIDES)[number];
 
 export type Dependency = {
@@ -17,7 +17,8 @@ export type Activity = {
   durationMonths: number;
   order: number;
   isMilestone?: boolean;
-  rowSpan?: number; // 1 (default) or 2
+  rowSpan?: number;
+  annotation?: string;
 };
 
 export type GanttRow = {

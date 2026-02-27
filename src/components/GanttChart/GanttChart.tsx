@@ -1,6 +1,7 @@
 import { useRef, useMemo, useEffect, useState } from 'react';
 import { useStore } from '@/stores';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { getTotalMonths } from '@/utils/timeline';
 import { TimelineHeader } from '@/components/Timeline/TimelineHeader';
 import { TimelineGrid } from '@/components/Timeline/TimelineGrid';
@@ -35,11 +36,10 @@ export function GanttChart() {
   const addRow = useStore((s) => s.addRow);
   const setEffectiveMonthWidth = useStore((s) => s.setEffectiveMonthWidth);
 
-  const sidebarLastTapRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
+  const checkSidebarDoubleTap = useDoubleTap();
   const dragCreate = useDragCreate();
   const dragMove = useDragMove();
   const dragResize = useDragResize();
-  const dragRowSpan = useDragRowSpan();
   const resizeSidebar = useResizeSidebar();
 
   const totalMonths = getTotalMonths(startYear, endYear, startMonth, endMonth);
@@ -91,6 +91,7 @@ export function GanttChart() {
     }
     return { rows, totalHeight: y };
   }, [chartRows, rowHeight]);
+  const dragRowSpan = useDragRowSpan(rowLayout.rows);
   const dragConnect = useDragConnect(rowLayout.rows, effectiveMonthWidth);
 
   const TIER_HEIGHT = 28;
@@ -142,14 +143,9 @@ export function GanttChart() {
           onPointerDown={(e) => {
             // Double-tap detection for touch (dblclick doesn't fire on touch)
             if ((e.target as HTMLElement).closest('[data-sidebar-row]')) return;
-            const now = Date.now();
-            const last = sidebarLastTapRef.current;
-            if (now - last.time < 300 && Math.abs(e.clientX - last.x) < 25 && Math.abs(e.clientY - last.y) < 25) {
-              sidebarLastTapRef.current = { time: 0, x: 0, y: 0 };
+            if (checkSidebarDoubleTap(e)) {
               addRow();
-              return;
             }
-            sidebarLastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
           }}
         >
           <Sidebar

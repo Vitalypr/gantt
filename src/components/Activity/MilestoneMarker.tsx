@@ -1,11 +1,15 @@
-import { useRef, useState, useEffect } from 'react';
-import { Palette, Pencil, Trash2, RectangleHorizontal } from 'lucide-react';
+import { useState } from 'react';
+import { MessageSquareText, Palette, Pencil, Trash2, RectangleHorizontal } from 'lucide-react';
 import type { Activity, AnchorSide } from '@/types/gantt';
+import { ANCHOR_SIDES } from '@/types/gantt';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { useStore } from '@/stores';
 import { cn } from '@/lib/utils';
 import { isColorDark } from '@/utils/color';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
+import { useInlineEdit } from '@/hooks/useInlineEdit';
 import { ColorPicker } from './ColorPicker';
+import { AnnotationPopover } from './AnnotationPopover';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -47,42 +51,14 @@ export function MilestoneMarker({
   const selectActivity = useStore((s) => s.selectActivity);
   const setEditingActivity = useStore((s) => s.setEditingActivity);
 
-  const inputRef = useRef<HTMLInputElement>(null);
-  const committedRef = useRef(false);
-  const [editValue, setEditValue] = useState(activity.name);
-  const lastTapRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
+  const { inputRef, editValue, setEditValue, commitEdit, handleEditKeyDown } = useInlineEdit(activity.id, activity.name, isEditing);
+  const checkDoubleTap = useDoubleTap();
+
+  const [annotationOpen, setAnnotationOpen] = useState(false);
+  const hasAnnotation = !!activity.annotation;
 
   const startMonth = moveOverride?.currentStartMonth ?? activity.startMonth;
   const left = startMonth * monthWidth;
-
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      committedRef.current = false;
-      setEditValue(activity.name);
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [isEditing, activity.name]);
-
-  const commitEdit = () => {
-    if (committedRef.current) return;
-    committedRef.current = true;
-    const trimmed = editValue.trim();
-    if (trimmed && trimmed !== activity.name) {
-      updateActivity(activity.id, { name: trimmed });
-    }
-    setEditingActivity(null);
-  };
-
-  const handleEditKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commitEdit();
-    } else if (e.key === 'Escape') {
-      committedRef.current = true;
-      setEditingActivity(null);
-    }
-  };
 
   const handleDelete = () => {
     removeActivity(activity.id);
@@ -129,15 +105,11 @@ export function MilestoneMarker({
             if (e.button !== 0) return;
 
             // Double-tap detection (touch devices don't fire dblclick)
-            const now = Date.now();
-            const last = lastTapRef.current;
-            if (now - last.time < 300 && Math.abs(e.clientX - last.x) < 25 && Math.abs(e.clientY - last.y) < 25) {
-              lastTapRef.current = { time: 0, x: 0, y: 0 };
+            if (checkDoubleTap(e)) {
               e.stopPropagation();
               onDoubleClick();
               return;
             }
-            lastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
 
             onDragMoveStart(e);
           }}
@@ -158,6 +130,16 @@ export function MilestoneMarker({
                 : '0 1px 3px rgba(0,0,0,0.15)',
               transition: 'box-shadow 0.15s ease',
             }}
+          />
+
+          {/* Annotation icon + popover */}
+          <AnnotationPopover
+            activityId={activity.id}
+            annotation={activity.annotation}
+            isEditing={isEditing}
+            isOpen={annotationOpen}
+            onOpenChange={setAnnotationOpen}
+            iconClassName="absolute top-0 left-0 z-10 flex h-3.5 w-3.5 items-center justify-center rounded-sm opacity-70 hover:opacity-100 transition-opacity text-foreground"
           />
 
           {/* Name label centered over the diamond */}
@@ -186,7 +168,7 @@ export function MilestoneMarker({
           {/* Anchor dots for dependency connections */}
           {onAnchorPointerDown && (
             <>
-              {(['left', 'right', 'top', 'bottom'] as const).map((side) => {
+              {ANCHOR_SIDES.map((side) => {
                 const sz = rhombusSize;
                 const cx = monthWidth / 2;
                 const cy = rowHeight / 2;
@@ -234,6 +216,10 @@ export function MilestoneMarker({
         >
           <Pencil className="mr-2 h-3.5 w-3.5" />
           Rename
+        </ContextMenuItem>
+        <ContextMenuItem onClick={() => setAnnotationOpen(true)}>
+          <MessageSquareText className="mr-2 h-3.5 w-3.5" />
+          {hasAnnotation ? 'Edit Annotation' : 'Add Annotation'}
         </ContextMenuItem>
         <ContextMenuSub>
           <ContextMenuSubTrigger>

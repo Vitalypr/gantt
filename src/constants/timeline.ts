@@ -22,3 +22,7 @@ export const MONTH_NAMES_SHORT = [
 ] as const;
 
 export const QUARTER_NAMES = ['Q1', 'Q2', 'Q3', 'Q4'] as const;
+
+export const DOUBLE_TAP_DELAY = 300; // ms
+export const DOUBLE_TAP_DISTANCE = 25; // px
+export const EDGE_THRESHOLD = 12; // px — resize handle hit zone
