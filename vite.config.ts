@@ -20,7 +20,7 @@ export default defineConfig({
         description: 'Interactive Gantt chart for project planning',
         theme_color: '#1e293b',
         background_color: '#ffffff',
-        display: 'standalone',
+        display: 'fullscreen',
         orientation: 'landscape',
         scope: '/gantt/',
         start_url: '/gantt/',
