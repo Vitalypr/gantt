@@ -11,7 +11,7 @@ export type PersistenceSlice = {
   saveCurrentChart: () => void;
   loadSavedChart: (id: string) => void;
   deleteSavedChart: (id: string) => void;
-  exportChart: () => void;
+  exportChart: () => Promise<void>;
   importChart: () => Promise<boolean>;
 };
 
@@ -85,10 +85,10 @@ export const createPersistenceSlice: StateCreator<
     });
   },
 
-  exportChart: () => {
+  exportChart: async () => {
     const state = get();
     const chart = { ...state.chart, viewSettings: snapshotViewSettings(state) };
-    persistence.exportChartToFile(chart);
+    await persistence.exportChartToFile(chart);
   },
 
   importChart: async () => {

@@ -76,20 +76,49 @@ function removeFromIndex(id: string): void {
   localStorage.setItem(INDEX_KEY, JSON.stringify(entries));
 }
 
-export function exportChartToFile(chart: GanttChart): void {
-  const json = JSON.stringify(chart, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
+function buildExportFileName(chartName: string): string {
   const now = new Date();
   const dd = String(now.getDate()).padStart(2, '0');
   const mm = String(now.getMonth() + 1).padStart(2, '0');
   const yy = String(now.getFullYear()).slice(-2);
   const hh = String(now.getHours()).padStart(2, '0');
   const min = String(now.getMinutes()).padStart(2, '0');
-  const safeName = chart.name.replace(/[^a-z0-9]/gi, '-').replace(/-+/g, '-').toLowerCase();
-  a.download = `${safeName}_${dd}.${mm}.${yy}-${hh}.${min}.gantt.json`;
+  const safeName = chartName.replace(/[^a-z0-9]/gi, '-').replace(/-+/g, '-').toLowerCase();
+  return `${safeName}_${dd}.${mm}.${yy}-${hh}.${min}.gantt.json`;
+}
+
+function buildFolderName(chartName: string): string {
+  return chartName.replace(/[^a-z0-9 ]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').trim() || 'gantt-export';
+}
+
+export async function exportChartToFile(chart: GanttChart): Promise<void> {
+  const json = JSON.stringify(chart, null, 2);
+  const fileName = buildExportFileName(chart.name);
+
+  // Try File System Access API — lets us create a project folder
+  if (window.showDirectoryPicker) {
+    try {
+      const parentDir = await window.showDirectoryPicker({ mode: 'readwrite' });
+      const folderName = buildFolderName(chart.name);
+      const projectDir = await parentDir.getDirectoryHandle(folderName, { create: true });
+      const fileHandle = await projectDir.getFileHandle(fileName, { create: true });
+      const writable = await fileHandle.createWritable();
+      await writable.write(json);
+      await writable.close();
+      return;
+    } catch (err) {
+      // User cancelled the picker — don't fall through to download
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      // Other errors — fall through to legacy download
+    }
+  }
+
+  // Fallback: standard download (mobile / Firefox)
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
   a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
