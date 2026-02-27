@@ -21,6 +21,7 @@ export default defineConfig({
         theme_color: '#1e293b',
         background_color: '#ffffff',
         display: 'standalone',
+        orientation: 'landscape',
         scope: '/gantt/',
         start_url: '/gantt/',
         icons: [

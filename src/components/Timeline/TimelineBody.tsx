@@ -1,4 +1,4 @@
-import { ROW_HEIGHT } from '@/constants/timeline';
+import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { useStore } from '@/stores';
 import { ActivityBar } from '@/components/Activity/ActivityBar';
 import { MilestoneMarker } from '@/components/Activity/MilestoneMarker';
@@ -23,7 +23,7 @@ type TimelineBodyProps = {
   dragMove: ReturnType<typeof useDragMove>;
   dragResize: ReturnType<typeof useDragResize>;
   dragRowSpan: ReturnType<typeof useDragRowSpan>;
-  onAnchorMouseDown?: (e: React.MouseEvent, activityId: string, side: AnchorSide, anchorPoint: { x: number; y: number }) => void;
+  onAnchorPointerDown?: (e: React.PointerEvent, activityId: string, side: AnchorSide, anchorPoint: { x: number; y: number }) => void;
 };
 
 export function TimelineBody({
@@ -34,8 +34,10 @@ export function TimelineBody({
   dragMove,
   dragResize,
   dragRowSpan,
-  onAnchorMouseDown,
+  onAnchorPointerDown,
 }: TimelineBodyProps) {
+  const rowSize = useStore((s) => s.rowSize);
+  const rowHeight = ROW_SIZE_MAP[rowSize];
   const allActivities = useStore((s) => s.chart.activities);
   const selectedActivity = useStore((s) => s.selectedActivity);
   const selectActivity = useStore((s) => s.selectActivity);
@@ -63,20 +65,20 @@ export function TimelineBody({
             className="absolute empty-row"
             style={{
               top: row.y,
-              height: ROW_HEIGHT,
+              height: rowHeight,
               left: 0,
               right: 0,
               overflow: 'visible',
               zIndex: hasSpanningActivity ? 1 : undefined,
             }}
-            onMouseDown={(e) => {
+            onPointerDown={(e) => {
               if (e.button !== 0) return;
               if ((e.target as HTMLElement).closest('[data-activity-bar]')) return;
               selectDependency(null);
               const scrollContainer = document.querySelector('[data-gantt-scroll]');
               const scrollLeft = scrollContainer?.scrollLeft ?? 0;
               const offset = sidebarWidth - scrollLeft;
-              dragCreate.onMouseDown(e, row.rowId, offset, monthWidth);
+              dragCreate.onPointerDown(e, row.rowId, offset, monthWidth);
             }}
           >
             {/* Ghost bar from drag-create */}
@@ -123,8 +125,8 @@ export function TimelineBody({
                     moveOverride={moveOverride}
                     onSelect={() => selectActivity({ activityId: activity.id })}
                     onDoubleClick={() => setEditingActivity({ activityId: activity.id })}
-                    onDragMoveStart={(e) => dragMove.onMouseDown(e, activity.id, activity.startMonth)}
-                    onAnchorMouseDown={onAnchorMouseDown}
+                    onDragMoveStart={(e) => dragMove.onPointerDown(e, activity.id, activity.startMonth)}
+                    onAnchorPointerDown={onAnchorPointerDown}
                   />
                 );
               }
@@ -148,9 +150,9 @@ export function TimelineBody({
                   rowSpanOverride={rowSpanOverride}
                   onSelect={() => selectActivity({ activityId: activity.id })}
                   onDoubleClick={() => setEditingActivity({ activityId: activity.id })}
-                  onDragMoveStart={(e) => dragMove.onMouseDown(e, activity.id, activity.startMonth)}
+                  onDragMoveStart={(e) => dragMove.onPointerDown(e, activity.id, activity.startMonth)}
                   onDragResizeStart={(e, edge) =>
-                    dragResize.onMouseDown(
+                    dragResize.onPointerDown(
                       e,
                       edge,
                       activity.id,
@@ -158,8 +160,8 @@ export function TimelineBody({
                       activity.durationMonths,
                     )
                   }
-                  onDragRowSpanStart={(e) => dragRowSpan.onMouseDown(e, activity.id, activityRowSpan)}
-                  onAnchorMouseDown={onAnchorMouseDown}
+                  onDragRowSpanStart={(e) => dragRowSpan.onPointerDown(e, activity.id, activityRowSpan)}
+                  onAnchorPointerDown={onAnchorPointerDown}
                 />
               );
             })}

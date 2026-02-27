@@ -27,22 +27,24 @@ export function useDragResize() {
     setDragState(next);
   };
 
-  const onMouseDown = useCallback(
+  const onPointerDown = useCallback(
     (
-      e: React.MouseEvent,
+      e: React.PointerEvent,
       edge: 'left' | 'right',
       activityId: string,
       startMonth: number,
       durationMonths: number,
     ) => {
-      e.preventDefault();
       e.stopPropagation();
       startXRef.current = e.clientX;
       isDraggingRef.current = false;
 
+      const target = e.target as HTMLElement;
+      target.setPointerCapture(e.pointerId);
+
       document.body.style.userSelect = 'none';
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
+      const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaX = moveEvent.clientX - startXRef.current;
 
         if (!isDraggingRef.current) {
@@ -79,11 +81,11 @@ export function useDragResize() {
         }
       };
 
-      const handleMouseUp = () => {
+      const handlePointerUp = () => {
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
+        target.onpointermove = null;
+        target.onpointerup = null;
 
         if (isDraggingRef.current) {
           const prev = dragStateRef.current;
@@ -106,11 +108,11 @@ export function useDragResize() {
         isDraggingRef.current = false;
       };
 
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      target.onpointermove = handlePointerMove;
+      target.onpointerup = handlePointerUp;
     },
     [updateActivity],
   );
 
-  return { onMouseDown, dragState };
+  return { onPointerDown, dragState };
 }

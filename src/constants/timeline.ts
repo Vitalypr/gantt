@@ -1,10 +1,16 @@
-export const MIN_MONTH_WIDTH = 20;
+export const MIN_MONTH_WIDTH = 4;
 export const MAX_MONTH_WIDTH = 180;
 export const ZOOM_STEP = 10;
 export const DEFAULT_MONTH_WIDTH = 80;
 
 export const ROW_HEIGHT = 40;
-export const HEADER_HEIGHT = 84; // 3 tiers: year(28) + quarter(28) + month(28)
+export const ROW_HEIGHT_SMALL = 28;
+export const ROW_HEIGHT_LARGE = 56;
+export const ROW_SIZE_MAP = {
+  small: ROW_HEIGHT_SMALL,
+  medium: ROW_HEIGHT,
+  large: ROW_HEIGHT_LARGE,
+} as const;
 
 export const DEFAULT_SIDEBAR_WIDTH = 240;
 export const MIN_SIDEBAR_WIDTH = 60;

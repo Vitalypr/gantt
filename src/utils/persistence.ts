@@ -82,11 +82,22 @@ export function exportChartToFile(chart: GanttChart): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${chart.name.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.gantt.json`;
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yy = String(now.getFullYear()).slice(-2);
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const safeName = chart.name.replace(/[^a-z0-9]/gi, '-').replace(/-+/g, '-').toLowerCase();
+  a.download = `${safeName}_${dd}.${mm}.${yy}-${hh}.${min}.gantt.json`;
+  a.style.display = 'none';
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Delay cleanup so mobile browsers can start the download
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 500);
 }
 
 export function importChartFromFile(): Promise<GanttChart | null> {
@@ -94,8 +105,17 @@ export function importChartFromFile(): Promise<GanttChart | null> {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json,.gantt.json';
+    input.style.display = 'none';
+    // Append to DOM — required for file picker on some mobile browsers
+    document.body.appendChild(input);
+
+    const cleanup = () => {
+      if (input.parentNode) document.body.removeChild(input);
+    };
+
     input.onchange = () => {
       const file = input.files?.[0];
+      cleanup();
       if (!file) {
         resolve(null);
         return;
@@ -117,7 +137,10 @@ export function importChartFromFile(): Promise<GanttChart | null> {
       reader.readAsText(file);
     };
     // Resolve null when the user cancels the file picker dialog
-    input.addEventListener('cancel', () => resolve(null));
+    input.addEventListener('cancel', () => {
+      cleanup();
+      resolve(null);
+    });
     input.click();
   });
 }
@@ -130,7 +153,7 @@ function migrateChart(raw: Record<string, unknown>): GanttChart {
   // If the chart already has `rows` at the top level, it's already migrated
   if (Array.isArray(raw['rows']) && Array.isArray(raw['activities'])) {
     // Pick only known GanttChart fields to prevent untrusted keys propagating into state
-    return {
+    const chart: GanttChart = {
       id: raw['id'] as string,
       name: raw['name'] as string,
       startYear: raw['startYear'] as number,
@@ -143,6 +166,18 @@ function migrateChart(raw: Record<string, unknown>): GanttChart {
       createdAt: (raw['createdAt'] as string) ?? new Date().toISOString(),
       updatedAt: (raw['updatedAt'] as string) ?? new Date().toISOString(),
     };
+    if (raw['viewSettings'] && typeof raw['viewSettings'] === 'object') {
+      const vs = raw['viewSettings'] as Record<string, unknown>;
+      chart.viewSettings = {
+        sidebarWidth: typeof vs['sidebarWidth'] === 'number' ? vs['sidebarWidth'] : 240,
+        monthWidth: typeof vs['monthWidth'] === 'number' ? vs['monthWidth'] : 80,
+        rowSize: (['small', 'medium', 'large'] as const).includes(vs['rowSize'] as 'small' | 'medium' | 'large')
+          ? (vs['rowSize'] as 'small' | 'medium' | 'large')
+          : 'medium',
+        showQuarters: typeof vs['showQuarters'] === 'boolean' ? vs['showQuarters'] : true,
+      };
+    }
+    return chart;
   }
 
   // Old format: has `disciplines` array

@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { AnchorSide } from '@/types/gantt';
 import { useStore } from '@/stores';
+import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { getActivityRect, getAnchorPoint } from '@/utils/dependencyRouting';
 import type { RowLayout } from '@/components/GanttChart/GanttChart';
 
@@ -25,13 +26,15 @@ export function useDragConnect(rows: RowLayout[], monthWidth: number) {
   const dragRef = useRef(dragState);
   dragRef.current = dragState;
 
+  const rowSize = useStore((s) => s.rowSize);
+  const rowHeight = ROW_SIZE_MAP[rowSize];
+  const rowHeightRef = useRef(rowHeight);
+  rowHeightRef.current = rowHeight;
+
   const addDependency = useStore((s) => s.addDependency);
   const addDependencyRef = useRef(addDependency);
   addDependencyRef.current = addDependency;
   const activities = useStore((s) => s.chart.activities);
-  const isDragging = dragState !== null;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const isDraggingStable = useMemo(() => isDragging, [isDragging]);
 
   const rowsRef = useRef(rows);
   rowsRef.current = rows;
@@ -40,10 +43,12 @@ export function useDragConnect(rows: RowLayout[], monthWidth: number) {
   const activitiesRef = useRef(activities);
   activitiesRef.current = activities;
 
-  const onAnchorMouseDown = useCallback(
-    (e: React.MouseEvent, activityId: string, side: AnchorSide, anchorPoint: { x: number; y: number }) => {
+  const onAnchorPointerDown = useCallback(
+    (e: React.PointerEvent, activityId: string, side: AnchorSide, anchorPoint: { x: number; y: number }) => {
       e.stopPropagation();
-      e.preventDefault();
+
+      const target = e.target as HTMLElement;
+      target.setPointerCapture(e.pointerId);
 
       const container = document.querySelector('[data-timeline-body]');
       if (!container) return;
@@ -57,73 +62,60 @@ export function useDragConnect(rows: RowLayout[], monthWidth: number) {
         mouseY: e.clientY - containerRect.top,
         snapTarget: null,
       });
+
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        const cRect = document.querySelector('[data-timeline-body]')?.getBoundingClientRect();
+        if (!cRect) return;
+        const mx = moveEvent.clientX - cRect.left;
+        const my = moveEvent.clientY - cRect.top;
+
+        let bestDist = SNAP_DISTANCE;
+        let bestTarget: NonNullable<DragConnectState>['snapTarget'] = null;
+
+        for (const row of rowsRef.current) {
+          for (const aid of row.activityIds) {
+            if (aid === activityId) continue;
+            const act = activitiesRef.current.find((a) => a.id === aid);
+            if (!act) continue;
+            const rect = getActivityRect(act, row.y, monthWidthRef.current, act.rowSpan ?? 1, rowHeightRef.current);
+            for (const s of ANCHOR_SIDES) {
+              const pt = getAnchorPoint(rect, s);
+              const dist = Math.hypot(pt.x - mx, pt.y - my);
+              if (dist < bestDist) {
+                bestDist = dist;
+                bestTarget = { activityId: aid, side: s, point: pt };
+              }
+            }
+          }
+        }
+
+        setDragState((prev) => {
+          if (!prev) return null;
+          return { ...prev, mouseX: mx, mouseY: my, snapTarget: bestTarget };
+        });
+      };
+
+      const handlePointerUp = () => {
+        target.onpointermove = null;
+        target.onpointerup = null;
+
+        const current = dragRef.current;
+        if (current?.snapTarget) {
+          addDependencyRef.current({
+            fromActivityId: current.fromActivityId,
+            toActivityId: current.snapTarget.activityId,
+            fromSide: current.fromSide,
+            toSide: current.snapTarget.side,
+          });
+        }
+        setDragState(null);
+      };
+
+      target.onpointermove = handlePointerMove;
+      target.onpointerup = handlePointerUp;
     },
     [],
   );
 
-  useEffect(() => {
-    if (!dragState) return;
-
-    function findSnapTarget(mx: number, my: number) {
-      const current = dragRef.current;
-      if (!current) return null;
-
-      let bestDist = SNAP_DISTANCE;
-      let bestTarget: NonNullable<DragConnectState>['snapTarget'] = null;
-
-      for (const row of rowsRef.current) {
-        for (const aid of row.activityIds) {
-          if (aid === current.fromActivityId) continue;
-          const act = activitiesRef.current.find((a) => a.id === aid);
-          if (!act) continue;
-          const rect = getActivityRect(act, row.y, monthWidthRef.current, act.rowSpan ?? 1);
-          for (const side of ANCHOR_SIDES) {
-            const pt = getAnchorPoint(rect, side);
-            const dist = Math.hypot(pt.x - mx, pt.y - my);
-            if (dist < bestDist) {
-              bestDist = dist;
-              bestTarget = { activityId: aid, side, point: pt };
-            }
-          }
-        }
-      }
-      return bestTarget;
-    }
-
-    function handleMouseMove(e: MouseEvent) {
-      const container = document.querySelector('[data-timeline-body]');
-      if (!container) return;
-      const containerRect = container.getBoundingClientRect();
-      const mx = e.clientX - containerRect.left;
-      const my = e.clientY - containerRect.top;
-      const snap = findSnapTarget(mx, my);
-
-      setDragState((prev) => {
-        if (!prev) return null;
-        return { ...prev, mouseX: mx, mouseY: my, snapTarget: snap };
-      });
-    }
-
-    function handleMouseUp() {
-      const current = dragRef.current;
-      if (current?.snapTarget) {
-        addDependencyRef.current({
-          fromActivityId: current.fromActivityId,
-          toActivityId: current.snapTarget.activityId,
-          fromSide: current.fromSide,
-          toSide: current.snapTarget.side,
-        });
-      }
-      setDragState(null);
-    }
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDraggingStable]);
-
-  return { dragState, onAnchorMouseDown };
+  return { dragState, onAnchorPointerDown };
 }

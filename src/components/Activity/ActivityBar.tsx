@@ -27,10 +27,10 @@ type ActivityBarProps = {
   rowSpanOverride: number | null;
   onSelect: () => void;
   onDoubleClick: () => void;
-  onDragMoveStart: (e: React.MouseEvent) => void;
-  onDragResizeStart: (e: React.MouseEvent, edge: 'left' | 'right') => void;
-  onDragRowSpanStart: (e: React.MouseEvent) => void;
-  onAnchorMouseDown?: (e: React.MouseEvent, activityId: string, side: AnchorSide, anchorPoint: { x: number; y: number }) => void;
+  onDragMoveStart: (e: React.PointerEvent) => void;
+  onDragResizeStart: (e: React.PointerEvent, edge: 'left' | 'right') => void;
+  onDragRowSpanStart: (e: React.PointerEvent) => void;
+  onAnchorPointerDown?: (e: React.PointerEvent, activityId: string, side: AnchorSide, anchorPoint: { x: number; y: number }) => void;
 };
 
 export function ActivityBar({
@@ -47,7 +47,7 @@ export function ActivityBar({
   onDragMoveStart,
   onDragResizeStart,
   onDragRowSpanStart,
-  onAnchorMouseDown,
+  onAnchorPointerDown,
 }: ActivityBarProps) {
   const updateActivity = useStore((s) => s.updateActivity);
   const removeActivity = useStore((s) => s.removeActivity);
@@ -57,6 +57,7 @@ export function ActivityBar({
   const inputRef = useRef<HTMLInputElement>(null);
   const committedRef = useRef(false);
   const [editValue, setEditValue] = useState(activity.name);
+  const lastTapRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
 
   const startMonth = moveOverride?.currentStartMonth ?? resizeOverride?.currentStartMonth ?? activity.startMonth;
   const duration = resizeOverride?.currentDuration ?? activity.durationMonths;
@@ -137,12 +138,24 @@ export function ActivityBar({
             e.stopPropagation();
             onDoubleClick();
           }}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             if (e.button !== 0) return;
+
+            // Double-tap detection (touch devices don't fire dblclick)
+            const now = Date.now();
+            const last = lastTapRef.current;
+            if (now - last.time < 300 && Math.abs(e.clientX - last.x) < 25 && Math.abs(e.clientY - last.y) < 25) {
+              lastTapRef.current = { time: 0, x: 0, y: 0 };
+              e.stopPropagation();
+              onDoubleClick();
+              return;
+            }
+            lastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
+
             const rect = e.currentTarget.getBoundingClientRect();
             const relX = e.clientX - rect.left;
             const relY = e.clientY - rect.top;
-            const edgeThreshold = 6;
+            const edgeThreshold = 12;
             // Bottom edge triggers row span drag
             if (relY > rect.height - edgeThreshold) {
               onDragRowSpanStart(e);
@@ -205,14 +218,14 @@ export function ActivityBar({
           <div className="resize-handle resize-handle--bottom" />
 
           {/* Anchor dots for dependency connections */}
-          {onAnchorMouseDown && (
+          {onAnchorPointerDown && (
             <>
               {(['left', 'right', 'top', 'bottom'] as const).map((side) => (
                 <div
                   key={side}
                   className="anchor-dot"
                   data-side={side}
-                  onMouseDown={(e) => {
+                  onPointerDown={(e) => {
                     const barEl = e.currentTarget.closest('[data-activity-bar]');
                     if (!barEl) return;
                     const barRect = barEl.getBoundingClientRect();
@@ -240,7 +253,7 @@ export function ActivityBar({
                         py = barRect.top - containerRect.top + bh;
                         break;
                     }
-                    onAnchorMouseDown(e, activity.id, side, { x: px, y: py });
+                    onAnchorPointerDown(e, activity.id, side, { x: px, y: py });
                   }}
                 />
               ))}

@@ -1,23 +1,22 @@
 import type { Activity, AnchorSide } from '@/types/gantt';
-import { ROW_HEIGHT } from '@/constants/timeline';
 
 type Point = { x: number; y: number };
 type Rect = { left: number; top: number; width: number; height: number };
 
 const BAR_PADDING_TOP = 4;
 const STEP_OUT = 12;
-const DETOUR_CLEARANCE = ROW_HEIGHT / 2; // route through the gap between rows
 
 export function getActivityRect(
   activity: Activity,
   rowY: number,
   monthWidth: number,
   rowSpan = 1,
+  rowHeight = 40,
 ): Rect {
   if (activity.isMilestone) {
     const cx = activity.startMonth * monthWidth + monthWidth / 2;
-    const cy = rowY + ROW_HEIGHT / 2;
-    const size = 22;
+    const cy = rowY + rowHeight / 2;
+    const size = Math.round(rowHeight * 0.55);
     return {
       left: cx - size / 2,
       top: cy - size / 2,
@@ -25,7 +24,7 @@ export function getActivityRect(
       height: size,
     };
   }
-  const spanHeight = ROW_HEIGHT * rowSpan - 8;
+  const spanHeight = rowHeight * rowSpan - 8;
   return {
     left: activity.startMonth * monthWidth,
     top: rowY + BAR_PADDING_TOP,
@@ -69,9 +68,11 @@ export function routeOrthogonal(
   fromSide: AnchorSide,
   toPt: Point,
   toSide: AnchorSide,
+  rowHeight = 40,
 ): Point[] {
   const a = stepOut(fromPt, fromSide);
   const b = stepOut(toPt, toSide);
+  const DETOUR_CLEARANCE = rowHeight / 2;
 
   const fromH = isHorizontalSide(fromSide);
   const toH = isHorizontalSide(toSide);

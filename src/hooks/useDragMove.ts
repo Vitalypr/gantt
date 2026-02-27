@@ -18,16 +18,18 @@ export function useDragMove() {
   const monthWidthRef = useRef(monthWidth);
   monthWidthRef.current = monthWidth;
 
-  const onMouseDown = useCallback(
-    (e: React.MouseEvent, activityId: string, currentStartMonth: number) => {
-      e.preventDefault();
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent, activityId: string, currentStartMonth: number) => {
       e.stopPropagation();
       startXRef.current = e.clientX;
       isDraggingRef.current = false;
 
+      const target = e.target as HTMLElement;
+      target.setPointerCapture(e.pointerId);
+
       document.body.style.userSelect = 'none';
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
+      const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaX = moveEvent.clientX - startXRef.current;
         const mw = monthWidthRef.current;
 
@@ -48,11 +50,11 @@ export function useDragMove() {
         setDragState((prev) => (prev ? { ...prev, currentStartMonth: newStart } : null));
       };
 
-      const handleMouseUp = (upEvent: MouseEvent) => {
+      const handlePointerUp = (upEvent: PointerEvent) => {
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
+        target.onpointermove = null;
+        target.onpointerup = null;
 
         if (isDraggingRef.current) {
           const deltaX = upEvent.clientX - startXRef.current;
@@ -69,11 +71,11 @@ export function useDragMove() {
         isDraggingRef.current = false;
       };
 
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      target.onpointermove = handlePointerMove;
+      target.onpointerup = handlePointerUp;
     },
     [updateActivity],
   );
 
-  return { onMouseDown, dragState };
+  return { onPointerDown, dragState };
 }

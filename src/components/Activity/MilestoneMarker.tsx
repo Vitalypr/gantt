@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { Palette, Pencil, Trash2, RectangleHorizontal } from 'lucide-react';
 import type { Activity, AnchorSide } from '@/types/gantt';
-import { ROW_HEIGHT } from '@/constants/timeline';
+import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { useStore } from '@/stores';
 import { cn } from '@/lib/utils';
 import { isColorDark } from '@/utils/color';
@@ -25,8 +25,8 @@ type MilestoneMarkerProps = {
   moveOverride: { currentStartMonth: number } | null;
   onSelect: () => void;
   onDoubleClick: () => void;
-  onDragMoveStart: (e: React.MouseEvent) => void;
-  onAnchorMouseDown?: (e: React.MouseEvent, activityId: string, side: AnchorSide, anchorPoint: { x: number; y: number }) => void;
+  onDragMoveStart: (e: React.PointerEvent) => void;
+  onAnchorPointerDown?: (e: React.PointerEvent, activityId: string, side: AnchorSide, anchorPoint: { x: number; y: number }) => void;
 };
 
 export function MilestoneMarker({
@@ -38,8 +38,10 @@ export function MilestoneMarker({
   onSelect,
   onDoubleClick,
   onDragMoveStart,
-  onAnchorMouseDown,
+  onAnchorPointerDown,
 }: MilestoneMarkerProps) {
+  const rowSize = useStore((s) => s.rowSize);
+  const rowHeight = ROW_SIZE_MAP[rowSize];
   const updateActivity = useStore((s) => s.updateActivity);
   const removeActivity = useStore((s) => s.removeActivity);
   const selectActivity = useStore((s) => s.selectActivity);
@@ -48,6 +50,7 @@ export function MilestoneMarker({
   const inputRef = useRef<HTMLInputElement>(null);
   const committedRef = useRef(false);
   const [editValue, setEditValue] = useState(activity.name);
+  const lastTapRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
 
   const startMonth = moveOverride?.currentStartMonth ?? activity.startMonth;
   const left = startMonth * monthWidth;
@@ -97,7 +100,7 @@ export function MilestoneMarker({
     });
   };
 
-  const rhombusSize = 22;
+  const rhombusSize = Math.round(rowHeight * 0.55);
 
   return (
     <ContextMenu>
@@ -122,8 +125,20 @@ export function MilestoneMarker({
             e.stopPropagation();
             onDoubleClick();
           }}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             if (e.button !== 0) return;
+
+            // Double-tap detection (touch devices don't fire dblclick)
+            const now = Date.now();
+            const last = lastTapRef.current;
+            if (now - last.time < 300 && Math.abs(e.clientX - last.x) < 25 && Math.abs(e.clientY - last.y) < 25) {
+              lastTapRef.current = { time: 0, x: 0, y: 0 };
+              e.stopPropagation();
+              onDoubleClick();
+              return;
+            }
+            lastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
+
             onDragMoveStart(e);
           }}
         >
@@ -169,12 +184,12 @@ export function MilestoneMarker({
           </div>
 
           {/* Anchor dots for dependency connections */}
-          {onAnchorMouseDown && (
+          {onAnchorPointerDown && (
             <>
               {(['left', 'right', 'top', 'bottom'] as const).map((side) => {
                 const sz = rhombusSize;
                 const cx = monthWidth / 2;
-                const cy = ROW_HEIGHT / 2;
+                const cy = rowHeight / 2;
                 let dotStyle: React.CSSProperties;
                 switch (side) {
                   case 'left':
@@ -195,7 +210,7 @@ export function MilestoneMarker({
                     key={side}
                     className="anchor-dot"
                     style={{ ...dotStyle, position: 'absolute' }}
-                    onMouseDown={(e) => {
+                    onPointerDown={(e) => {
                       const barEl = e.currentTarget.closest('[data-activity-bar]');
                       if (!barEl) return;
                       const container = document.querySelector('[data-timeline-body]');
@@ -204,7 +219,7 @@ export function MilestoneMarker({
                       const dotRect = e.currentTarget.getBoundingClientRect();
                       const px = dotRect.left - containerRect.left + 4;
                       const py = dotRect.top - containerRect.top + 4;
-                      onAnchorMouseDown(e, activity.id, side, { x: px, y: py });
+                      onAnchorPointerDown(e, activity.id, side, { x: px, y: py });
                     }}
                   />
                 );

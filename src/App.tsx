@@ -40,6 +40,17 @@ export function App() {
   useAutoSave();
   const { show: showEasterEgg, handleDone: handleEasterEggDone } = useEasterEgg();
 
+  // Restore view settings from auto-saved chart on initial mount
+  useEffect(() => {
+    const { chart, setMonthWidth, setSidebarWidth, setRowSize, setShowQuarters } = useStore.getState();
+    if (chart.viewSettings) {
+      setMonthWidth(chart.viewSettings.monthWidth);
+      setSidebarWidth(chart.viewSettings.sidebarWidth);
+      setRowSize(chart.viewSettings.rowSize);
+      setShowQuarters(chart.viewSettings.showQuarters);
+    }
+  }, []);
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       <Toolbar />

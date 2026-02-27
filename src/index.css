@@ -96,6 +96,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Hide scrollbar but allow scroll (toolbar on mobile) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Refined scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -130,6 +139,7 @@ body {
 /* Activity bar transitions */
 .activity-bar {
   transition: box-shadow 0.15s ease, transform 0.1s ease;
+  touch-action: none;
 }
 
 .activity-bar:hover {
@@ -153,6 +163,7 @@ body {
   height: 100%;
   cursor: ew-resize;
   z-index: 2;
+  touch-action: none;
 }
 
 .resize-handle--left {
@@ -262,6 +273,7 @@ body {
   z-index: 5;
   cursor: crosshair;
   pointer-events: auto;
+  touch-action: none;
 }
 
 .group:hover .anchor-dot,

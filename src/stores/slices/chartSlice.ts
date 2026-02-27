@@ -21,9 +21,6 @@ export type ChartSlice = {
 
   addDependency: (dep: Omit<Dependency, 'id'>) => string;
   removeDependency: (id: string) => void;
-
-  addDiscipline: (name: string) => string;
-  renameDiscipline: (id: string, name: string) => void;
 };
 
 function createDefaultChart(): GanttChart {
@@ -251,29 +248,5 @@ export const createChartSlice: StateCreator<ChartSlice, [['zustand/immer', never
     set((state) => {
       state.chart.dependencies = state.chart.dependencies.filter((d) => d.id !== id);
       state.chart.updatedAt = new Date().toISOString();
-    }),
-
-  addDiscipline: (name) => {
-    const id = nanoid();
-    set((state) => {
-      const maxOrder = state.chart.rows.reduce((max, r) => Math.max(max, r.order), -1);
-      state.chart.rows.push({
-        id,
-        name,
-        order: maxOrder + 1,
-        activityIds: [],
-      });
-      state.chart.updatedAt = new Date().toISOString();
-    });
-    return id;
-  },
-
-  renameDiscipline: (id, name) =>
-    set((state) => {
-      const row = state.chart.rows.find((r) => r.id === id);
-      if (row) {
-        row.name = name;
-        state.chart.updatedAt = new Date().toISOString();
-      }
     }),
 });

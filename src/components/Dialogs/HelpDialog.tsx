@@ -24,6 +24,10 @@ import {
   FolderOpen,
   Download,
   Upload,
+  Maximize2,
+  Sun,
+  Smartphone,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -136,7 +140,8 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
             <p className="text-[12px] leading-relaxed text-muted-foreground">
               <span className="font-semibold text-foreground">High Level Gantt Chart</span> is an
               interactive project planning tool. Create rows for your work streams, drag to create
-              activity bars, connect them with dependencies, and export your plan.
+              activity bars, connect them with dependencies, and export your plan. Works on desktop
+              and mobile (touch).
             </p>
           </div>
 
@@ -145,13 +150,13 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
           <div className="ml-[38px] space-y-0.5">
             <HelpItem icon={Plus} label="Add Row">
               Click the <span className="font-semibold text-foreground">+ Row</span> button in the
-              toolbar, or right-click the sidebar and select <span className="font-semibold text-foreground">Add Row Below</span>.
+              toolbar (desktop only), or right-click the sidebar and select <span className="font-semibold text-foreground">Add Row Below</span>.
             </HelpItem>
             <HelpItem icon={Pencil} label="Rename Row">
-              Double-click the row name in the sidebar, or right-click &rarr; <span className="font-semibold text-foreground">Rename</span>.
+              Double-click (or double-tap) the row name in the sidebar, or right-click &rarr; <span className="font-semibold text-foreground">Rename</span>.
             </HelpItem>
             <HelpItem icon={Trash2} label="Delete Row">
-              Right-click the row &rarr; <span className="font-semibold text-foreground">Delete Row</span>. This also removes all activities in that row.
+              Right-click (or long-press) the row &rarr; <span className="font-semibold text-foreground">Delete Row</span>. This also removes all activities in that row.
             </HelpItem>
             <HelpItem icon={ArrowUpDown} label="Move Row">
               Right-click the row &rarr; <span className="font-semibold text-foreground">Move Up</span> or <span className="font-semibold text-foreground">Move Down</span>.
@@ -168,19 +173,20 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
           <SectionHeading icon={MousePointerClick} color="#f59e0b" title="Activities" />
           <div className="ml-[38px] space-y-0.5">
             <HelpItem icon={GripHorizontal} label="Create Activity">
-              Click &amp; drag horizontally on an empty row area in the timeline.
+              Drag horizontally on an empty row area to create an activity spanning the dragged range.
+              On touch devices, double-tap an empty cell to create a 1-month activity.
             </HelpItem>
             <HelpItem icon={Move} label="Move Activity">
-              Click &amp; drag an activity bar to reposition it along the timeline.
+              Drag an activity bar to reposition it along the timeline. Snaps to month grid.
             </HelpItem>
             <HelpItem icon={GripHorizontal} label="Resize Activity">
               Drag the left or right edge of an activity bar to change its start or duration.
             </HelpItem>
             <HelpItem icon={Pencil} label="Rename Activity">
-              Double-click on an activity bar, type the new name, and press <Kbd>Enter</Kbd>.
+              Double-click (or double-tap) on an activity bar, type the new name, and press <Kbd>Enter</Kbd>.
             </HelpItem>
             <HelpItem icon={Trash2} label="Delete Activity">
-              Right-click the activity &rarr; <span className="font-semibold text-foreground">Delete</span>.
+              Right-click (or long-press) the activity &rarr; <span className="font-semibold text-foreground">Delete</span>.
             </HelpItem>
             <HelpItem icon={Palette} label="Change Color">
               Right-click the activity &rarr; <span className="font-semibold text-foreground">Color</span> &rarr; pick from the palette.
@@ -201,13 +207,13 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
           <div className="ml-[38px] space-y-0.5">
             <HelpItem icon={Diamond} label="Convert to Milestone">
               Right-click an activity &rarr; <span className="font-semibold text-foreground">Convert to Milestone</span>. The bar
-              becomes a diamond marker.
+              becomes a diamond marker. Milestones scale with row height.
             </HelpItem>
             <HelpItem icon={GripHorizontal} label="Convert Back">
               Right-click a milestone &rarr; <span className="font-semibold text-foreground">Convert to Activity</span>.
             </HelpItem>
             <HelpItem icon={Move} label="Interact">
-              Milestones can be moved by dragging and renamed by double-clicking.
+              Milestones can be moved by dragging and renamed by double-clicking (or double-tapping).
             </HelpItem>
           </div>
 
@@ -218,11 +224,11 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
           <div className="ml-[38px] space-y-0.5">
             <HelpItem icon={ToggleLeft} label="Enter Connect Mode">
               Click the <span className="font-semibold text-foreground">Connect</span> button in the
-              toolbar. It turns blue when active.
+              toolbar (icon-only on mobile). It turns blue when active.
             </HelpItem>
             <HelpItem icon={Circle} label="Create Dependency">
-              In Connect mode, hover an activity to see anchor dots on all 4 sides. Click &amp; drag
-              from any anchor dot to another activity's anchor dot.
+              In Connect mode, hover (or tap) an activity to see anchor dots on all 4 sides.
+              Drag from any anchor dot to another activity&apos;s anchor dot.
             </HelpItem>
             <HelpItem icon={Trash2} label="Delete Dependency">
               Click on a dependency arrow to select it, then press <Kbd>Delete</Kbd>.
@@ -236,25 +242,36 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
 
           <Divider />
 
-          {/* Timeline & Navigation */}
-          <SectionHeading icon={Calendar} color="#3b82f6" title="Timeline & Navigation" />
+          {/* Timeline & View */}
+          <SectionHeading icon={Calendar} color="#3b82f6" title="Timeline & View" />
           <div className="ml-[38px] space-y-0.5">
             <HelpItem icon={ZoomIn} label="Zoom In/Out">
               Use the <span className="font-semibold text-foreground">+</span> / <span className="font-semibold text-foreground">&minus;</span> buttons
-              in the toolbar to adjust month column width. The current zoom level is shown
-              between the buttons in pixels (e.g. <code className="rounded bg-muted px-1 text-[11px]">80px</code>).
-              Larger values mean wider columns and more detail.
+              to adjust month column width. The zoom level is shown in pixels on desktop
+              (e.g. <code className="rounded bg-muted px-1 text-[11px]">80px</code>).
+              Zoom can go as low as 4px for a bird&apos;s-eye view.
             </HelpItem>
-            <HelpItem icon={Calendar} label="Scroll to Today">
-              Click the <span className="font-semibold text-foreground">calendar</span> icon in the
-              toolbar to smoothly scroll the timeline so the current date is centered in view.
+            <HelpItem icon={Maximize2} label="Fit Chart to View">
+              Click the <span className="font-semibold text-foreground">expand</span> icon to auto-zoom
+              so the entire chart (start to end date) fits in the visible area without scrolling.
             </HelpItem>
             <HelpItem icon={GripHorizontal} label="Date Range">
               Use the month and year dropdowns in the toolbar to set the chart&apos;s visible time
-              range. The start and end define which months appear as columns on the timeline.
+              range. Activities preserve their calendar position when the range changes.
+            </HelpItem>
+            <HelpItem icon={Rows3} label="Row Height">
+              Click the <span className="font-semibold text-foreground">rows</span> icon to cycle
+              through row sizes: <span className="font-semibold text-foreground">Small</span> (28px)
+              &rarr; <span className="font-semibold text-foreground">Medium</span> (40px)
+              &rarr; <span className="font-semibold text-foreground">Large</span> (56px).
+              Activities, milestones, and grid all scale accordingly.
+            </HelpItem>
+            <HelpItem icon={Calendar} label="Quarter Row">
+              Click the <span className="font-semibold text-foreground">Qr</span> button to show
+              or hide the quarter tier (Q1/Q2/Q3/Q4) in the timeline header.
             </HelpItem>
             <HelpItem icon={Move} label="Scroll">
-              Standard mouse scroll or drag to navigate the chart.
+              Mouse scroll, trackpad, or touch drag to navigate the chart.
             </HelpItem>
             <div className="py-1.5 ml-[30px]">
               <p className="text-[11px] italic text-muted-foreground/70">
@@ -275,14 +292,56 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
               Click the folder icon to browse and load previously saved charts.
             </HelpItem>
             <HelpItem icon={Download} label="Export JSON">
-              Click the download icon to export the chart as a <code className="rounded bg-muted px-1 text-[11px]">.json</code> file.
+              Click the download icon to export the chart as a <code className="rounded bg-muted px-1 text-[11px]">.gantt.json</code> file.
+              The export includes all view settings (sidebar width, zoom level, row size, quarter visibility).
             </HelpItem>
             <HelpItem icon={Upload} label="Import JSON">
               Click the upload icon to load a chart from a <code className="rounded bg-muted px-1 text-[11px]">.json</code> file.
+              View settings are restored automatically if present.
             </HelpItem>
             <div className="py-1.5 ml-[30px]">
               <p className="text-[11px] italic text-muted-foreground/70">
-                Charts are also automatically saved as you work.
+                Charts are also automatically saved as you work, including view settings.
+              </p>
+            </div>
+          </div>
+
+          <Divider />
+
+          {/* Display */}
+          <SectionHeading icon={Settings} color="#06b6d4" title="Display Settings" />
+          <div className="ml-[38px] space-y-0.5">
+            <HelpItem icon={Sun} label="Dark / Light Mode">
+              Click the <span className="font-semibold text-foreground">sun/moon</span> icon in the
+              toolbar to toggle between dark and light themes.
+            </HelpItem>
+            <HelpItem icon={GripHorizontal} label="Resize Sidebar">
+              Drag the vertical handle on the right edge of the sidebar to adjust its width.
+              On touch devices, the handle is wider for easier targeting.
+            </HelpItem>
+            <HelpItem icon={Pencil} label="Edit Chart Name">
+              Click the name field in the toolbar to rename your chart.
+            </HelpItem>
+          </div>
+
+          <Divider />
+
+          {/* Touch / Mobile */}
+          <SectionHeading icon={Smartphone} color="#f43f5e" title="Touch & Mobile" />
+          <div className="ml-[38px] space-y-0.5">
+            <HelpItem icon={GripHorizontal} label="Create Activity">
+              Double-tap on an empty cell to create a 1-month activity. Drag to create longer activities.
+            </HelpItem>
+            <HelpItem icon={Move} label="Move & Resize">
+              Touch and drag activities to move them. Drag edges to resize.
+              All drag interactions work with touch.
+            </HelpItem>
+            <HelpItem icon={Pencil} label="Rename">
+              Double-tap an activity or row name to edit it.
+            </HelpItem>
+            <div className="py-1.5 ml-[30px]">
+              <p className="text-[11px] italic text-muted-foreground/70">
+                The app can be installed as a PWA from the browser menu for a native-like experience.
               </p>
             </div>
           </div>
@@ -307,23 +366,31 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
             <div className="flex gap-2 items-start">
               <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/40" />
               <p className="text-[12px] leading-relaxed text-muted-foreground">
-                <span className="font-semibold text-foreground">Resize sidebar</span> &mdash; drag
-                the right edge of the sidebar to adjust its width.
-              </p>
-            </div>
-            <div className="flex gap-2 items-start">
-              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/40" />
-              <p className="text-[12px] leading-relaxed text-muted-foreground">
-                <span className="font-semibold text-foreground">Edit chart name</span> &mdash; click
-                the name next to the Gantt icon in the toolbar to rename your chart.
-              </p>
-            </div>
-            <div className="flex gap-2 items-start">
-              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/40" />
-              <p className="text-[12px] leading-relaxed text-muted-foreground">
                 <span className="font-semibold text-foreground">Duration label</span> &mdash; each
                 activity bar shows its duration in the bottom-right corner (e.g.{' '}
                 <code className="rounded bg-muted px-1 text-[11px]">3m</code>).
+              </p>
+            </div>
+            <div className="flex gap-2 items-start">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/40" />
+              <p className="text-[12px] leading-relaxed text-muted-foreground">
+                <span className="font-semibold text-foreground">Fit to view</span> &mdash; use the
+                expand button to quickly see the entire chart, then zoom in on areas of interest.
+              </p>
+            </div>
+            <div className="flex gap-2 items-start">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/40" />
+              <p className="text-[12px] leading-relaxed text-muted-foreground">
+                <span className="font-semibold text-foreground">Portable export</span> &mdash; exported
+                JSON files include all view settings, so the chart looks the same when imported on
+                another device.
+              </p>
+            </div>
+            <div className="flex gap-2 items-start">
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-muted-foreground/40" />
+              <p className="text-[12px] leading-relaxed text-muted-foreground">
+                <span className="font-semibold text-foreground">Small row height</span> &mdash; use
+                small rows with low zoom to fit large projects on a single screen for overview presentations.
               </p>
             </div>
           </div>

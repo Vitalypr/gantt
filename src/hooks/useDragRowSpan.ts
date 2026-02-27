@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useStore } from '@/stores';
-import { ROW_HEIGHT } from '@/constants/timeline';
+import { ROW_SIZE_MAP } from '@/constants/timeline';
 
 const DRAG_THRESHOLD = 4;
 
@@ -11,6 +11,8 @@ type DragRowSpanState = {
 } | null;
 
 export function useDragRowSpan() {
+  const rowSize = useStore((s) => s.rowSize);
+  const rowHeight = ROW_SIZE_MAP[rowSize];
   const updateActivity = useStore((s) => s.updateActivity);
   const [dragState, setDragState] = useState<DragRowSpanState>(null);
   const startYRef = useRef(0);
@@ -22,16 +24,18 @@ export function useDragRowSpan() {
     setDragState(next);
   };
 
-  const onMouseDown = useCallback(
-    (e: React.MouseEvent, activityId: string, currentRowSpan: number) => {
-      e.preventDefault();
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent, activityId: string, currentRowSpan: number) => {
       e.stopPropagation();
       startYRef.current = e.clientY;
       isDraggingRef.current = false;
 
+      const target = e.target as HTMLElement;
+      target.setPointerCapture(e.pointerId);
+
       document.body.style.userSelect = 'none';
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
+      const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaY = moveEvent.clientY - startYRef.current;
 
         if (!isDraggingRef.current) {
@@ -46,7 +50,7 @@ export function useDragRowSpan() {
         }
 
         // Snap to 1 or 2 based on delta crossing half-row threshold
-        const threshold = ROW_HEIGHT / 2;
+        const threshold = rowHeight / 2;
         let newRowSpan: number;
         if (currentRowSpan === 1) {
           // Dragging from span-1: expand to 2 if dragged down past threshold
@@ -62,11 +66,11 @@ export function useDragRowSpan() {
         }
       };
 
-      const handleMouseUp = () => {
+      const handlePointerUp = () => {
         document.body.style.userSelect = '';
         document.body.style.cursor = '';
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
+        target.onpointermove = null;
+        target.onpointerup = null;
 
         if (isDraggingRef.current) {
           const prev = dragStateRef.current;
@@ -83,11 +87,11 @@ export function useDragRowSpan() {
         isDraggingRef.current = false;
       };
 
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      target.onpointermove = handlePointerMove;
+      target.onpointerup = handlePointerUp;
     },
-    [updateActivity],
+    [updateActivity, rowHeight],
   );
 
-  return { onMouseDown, dragState };
+  return { onPointerDown, dragState };
 }

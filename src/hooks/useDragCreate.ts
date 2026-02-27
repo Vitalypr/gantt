@@ -2,8 +2,9 @@ import { useCallback, useRef, useState } from 'react';
 import { useStore } from '@/stores';
 import { DEFAULT_ACTIVITY_COLOR } from '@/constants/colors';
 
-const DRAG_THRESHOLD = 6;
-const DOUBLE_CLICK_DELAY = 300; // ms
+const DRAG_THRESHOLD = 20;
+const DOUBLE_TAP_DELAY = 300; // ms
+const DOUBLE_TAP_DISTANCE = 30; // px
 
 type DragCreateState = {
   rowId: string;
@@ -17,11 +18,7 @@ export function useDragCreate() {
   const setEditingActivity = useStore((s) => s.setEditingActivity);
   const [dragState, setDragState] = useState<DragCreateState>(null);
 
-  const lastClickRef = useRef<{ time: number; rowId: string; x: number }>({
-    time: 0,
-    rowId: '',
-    x: 0,
-  });
+  const lastTapRef = useRef<{ time: number; rowId: string; x: number }>({ time: 0, rowId: '', x: 0 });
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
 
@@ -41,45 +38,43 @@ export function useDragCreate() {
     [addActivity, setEditingActivity],
   );
 
-  const onMouseDown = useCallback(
-    (e: React.MouseEvent, rowId: string, timelineLeftOffset: number, monthWidth: number) => {
+  const onPointerDown = useCallback(
+    (e: React.PointerEvent, rowId: string, timelineLeftOffset: number, monthWidth: number) => {
       if (e.button !== 0) return;
 
       const relativeX = e.clientX - timelineLeftOffset;
       const startMonth = Math.max(0, Math.floor(relativeX / monthWidth));
       const now = Date.now();
 
-      // Detect double-click: same row, close position, within time window
-      const last = lastClickRef.current;
-      const isDoubleClick =
-        now - last.time < DOUBLE_CLICK_DELAY &&
+      // Double-tap detection
+      const last = lastTapRef.current;
+      const isDoubleTap =
+        now - last.time < DOUBLE_TAP_DELAY &&
         last.rowId === rowId &&
-        Math.abs(e.clientX - last.x) < 30;
+        Math.abs(e.clientX - last.x) < DOUBLE_TAP_DISTANCE;
 
-      if (isDoubleClick) {
-        // Reset to prevent triple-click
-        lastClickRef.current = { time: 0, rowId: '', x: 0 };
-        // Create 1-month activity at click position
+      if (isDoubleTap) {
+        lastTapRef.current = { time: 0, rowId: '', x: 0 };
         createActivity(startMonth, 1, rowId);
         return;
       }
 
-      // Record this click for double-click detection
-      lastClickRef.current = { time: now, rowId, x: e.clientX };
+      lastTapRef.current = { time: now, rowId, x: e.clientX };
 
       startXRef.current = e.clientX;
       isDraggingRef.current = false;
 
+      const target = e.target as HTMLElement;
+      target.setPointerCapture(e.pointerId);
+
       document.body.style.userSelect = 'none';
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
+      const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaX = moveEvent.clientX - startXRef.current;
 
         if (!isDraggingRef.current) {
           if (Math.abs(deltaX) < DRAG_THRESHOLD) return;
           isDraggingRef.current = true;
-          // Clear double-click timer since user is dragging
-          lastClickRef.current = { time: 0, rowId: '', x: 0 };
         }
 
         const currentX = moveEvent.clientX - timelineLeftOffset;
@@ -87,27 +82,30 @@ export function useDragCreate() {
         setDragState({ rowId, startMonth, currentMonth, monthWidth });
       };
 
-      const handleMouseUp = (upEvent: MouseEvent) => {
+      const handlePointerUp = (upEvent: PointerEvent) => {
         document.body.style.userSelect = '';
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
+        target.onpointermove = null;
+        target.onpointerup = null;
 
         if (isDraggingRef.current) {
           const endX = upEvent.clientX - timelineLeftOffset;
           const endMonth = Math.max(0, Math.round(endX / monthWidth));
           const s = Math.min(startMonth, endMonth);
           const e2 = Math.max(startMonth, endMonth);
-          const duration = Math.max(1, e2 - s);
+          const duration = e2 - s;
 
-          createActivity(s, duration, rowId);
+          // Only create if the drag actually spans at least 1 month
+          if (duration >= 1) {
+            createActivity(s, duration, rowId);
+          }
         }
 
         setDragState(null);
         isDraggingRef.current = false;
       };
 
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
+      target.onpointermove = handlePointerMove;
+      target.onpointerup = handlePointerUp;
     },
     [createActivity],
   );
@@ -120,5 +118,5 @@ export function useDragCreate() {
       }
     : null;
 
-  return { onMouseDown, ghostBar };
+  return { onPointerDown, ghostBar };
 }

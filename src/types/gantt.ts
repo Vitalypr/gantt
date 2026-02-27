@@ -29,6 +29,13 @@ export type GanttRow = {
   mergedWithNext?: boolean;
 };
 
+export type ViewSettings = {
+  sidebarWidth: number;
+  monthWidth: number;
+  rowSize: 'small' | 'medium' | 'large';
+  showQuarters: boolean;
+};
+
 export type GanttChart = {
   id: string;
   name: string;
@@ -39,6 +46,7 @@ export type GanttChart = {
   rows: GanttRow[];
   activities: Activity[];
   dependencies: Dependency[];
+  viewSettings?: ViewSettings;
   createdAt: string;
   updatedAt: string;
 };

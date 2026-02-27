@@ -1,4 +1,5 @@
-import { ROW_HEIGHT } from '@/constants/timeline';
+import { useStore } from '@/stores';
+import { ROW_SIZE_MAP } from '@/constants/timeline';
 
 type Row = {
   rowId: string;
@@ -14,10 +15,12 @@ type TimelineGridProps = {
 };
 
 export function TimelineGrid({ totalMonths, monthWidth, rows, totalHeight, chartStartMonth }: TimelineGridProps) {
+  const rowSize = useStore((s) => s.rowSize);
+  const rowHeight = ROW_SIZE_MAP[rowSize];
   const gridWidth = totalMonths * monthWidth;
   // Bottom border: at the end of the last row
   const lastRow = rows[rows.length - 1];
-  const bottomY = lastRow ? lastRow.y + ROW_HEIGHT : 0;
+  const bottomY = lastRow ? lastRow.y + rowHeight : 0;
 
   // Months until next January from chart start (0-based month index)
   const offsetToJan = (12 - ((chartStartMonth - 1) % 12)) % 12;
@@ -44,7 +47,7 @@ export function TimelineGrid({ totalMonths, monthWidth, rows, totalHeight, chart
 
         {/* Horizontal row lines */}
         {rows.map((row) => {
-          const y = row.y + ROW_HEIGHT;
+          const y = row.y + rowHeight;
           return (
             <line
               key={`h-${row.rowId}`}

@@ -46,7 +46,4 @@ export const ACTIVITY_COLOR_GROUPS = [
   },
 ] as const;
 
-// Flat list for backward compat / defaults
-export const ACTIVITY_COLORS = ACTIVITY_COLOR_GROUPS.flatMap((g) => g.colors);
-
 export const DEFAULT_ACTIVITY_COLOR = '#3b82f6';

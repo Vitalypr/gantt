@@ -8,23 +8,26 @@ type TimelineHeaderProps = {
   chartEndMonth: number;
   monthWidth: number;
   totalWidth: number;
+  showQuarters: boolean;
 };
 
 const TIER_HEIGHT = 28;
 
-export function TimelineHeader({ startYear, endYear, chartStartMonth, chartEndMonth, monthWidth, totalWidth }: TimelineHeaderProps) {
+export function TimelineHeader({ startYear, endYear, chartStartMonth, chartEndMonth, monthWidth, totalWidth, showQuarters }: TimelineHeaderProps) {
   const years = useMemo(() => buildYearHeaders(startYear, endYear, chartStartMonth, chartEndMonth), [startYear, endYear, chartStartMonth, chartEndMonth]);
   const quarters = useMemo(() => buildQuarterHeaders(startYear, endYear, chartStartMonth, chartEndMonth), [startYear, endYear, chartStartMonth, chartEndMonth]);
   const months = useMemo(() => buildMonthHeaders(startYear, endYear, chartStartMonth, chartEndMonth), [startYear, endYear, chartStartMonth, chartEndMonth]);
 
+  const tierCount = showQuarters ? 3 : 2;
+
   return (
-    <div className="relative border-b bg-background" style={{ width: totalWidth, height: TIER_HEIGHT * 3 }}>
+    <div className="relative border-b bg-background" style={{ width: totalWidth, height: TIER_HEIGHT * tierCount }}>
       {/* Year tier */}
       <div className="flex" style={{ height: TIER_HEIGHT }}>
         {years.map((y) => (
           <div
             key={`y-${y.year}`}
-            className="flex items-center justify-center border-b border-r text-xs font-semibold text-foreground"
+            className="flex items-center justify-center border-b border-r text-xs font-semibold text-foreground overflow-hidden"
             style={{ width: y.spanMonths * monthWidth, height: TIER_HEIGHT }}
           >
             {y.year}
@@ -33,27 +36,29 @@ export function TimelineHeader({ startYear, endYear, chartStartMonth, chartEndMo
       </div>
 
       {/* Quarter tier */}
-      <div className="flex" style={{ height: TIER_HEIGHT }}>
-        {quarters.map((q, i) => (
-          <div
-            key={`q-${i}`}
-            className="flex items-center justify-center border-b border-r text-xs text-muted-foreground"
-            style={{ width: q.spanMonths * monthWidth, height: TIER_HEIGHT }}
-          >
-            {monthWidth >= 40 ? q.label : q.label.split(' ')[0]}
-          </div>
-        ))}
-      </div>
+      {showQuarters && (
+        <div className="flex" style={{ height: TIER_HEIGHT }}>
+          {quarters.map((q, i) => (
+            <div
+              key={`q-${i}`}
+              className="flex items-center justify-center border-b border-r text-xs text-muted-foreground overflow-hidden"
+              style={{ width: q.spanMonths * monthWidth, height: TIER_HEIGHT }}
+            >
+              {monthWidth >= 40 ? q.label : monthWidth >= 14 ? q.label.split(' ')[0] : ''}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Month tier */}
       <div className="flex" style={{ height: TIER_HEIGHT }}>
         {months.map((m) => (
           <div
             key={m.monthIndex}
-            className="flex items-center justify-center border-r text-xs text-muted-foreground"
+            className="flex items-center justify-center border-r text-xs text-muted-foreground overflow-hidden"
             style={{ width: monthWidth, height: TIER_HEIGHT }}
           >
-            {monthWidth >= 50 ? m.label : m.monthNumber}
+            {monthWidth >= 50 ? m.label : monthWidth >= 14 ? m.monthNumber : ''}
           </div>
         ))}
       </div>

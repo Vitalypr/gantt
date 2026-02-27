@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Pencil, Trash2, Plus, Merge, SplitSquareVertical, ArrowUp, ArrowDown } from 'lucide-react';
-import { ROW_HEIGHT } from '@/constants/timeline';
+import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { useStore } from '@/stores';
 import { cn } from '@/lib/utils';
 import {
@@ -21,10 +21,12 @@ type Row = {
 type SidebarProps = {
   rows: Row[];
   sidebarWidth: number;
-  onResizeMouseDown: (e: React.MouseEvent) => void;
+  onResizePointerDown: (e: React.PointerEvent) => void;
 };
 
-export function Sidebar({ rows, sidebarWidth, onResizeMouseDown }: SidebarProps) {
+export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProps) {
+  const rowSize = useStore((s) => s.rowSize);
+  const rowHeight = ROW_SIZE_MAP[rowSize];
   const chartRows = useStore((s) => s.chart.rows);
   const addRow = useStore((s) => s.addRow);
   const renameRow = useStore((s) => s.renameRow);
@@ -35,7 +37,7 @@ export function Sidebar({ rows, sidebarWidth, onResizeMouseDown }: SidebarProps)
 
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
 
-  const totalHeight = rows.length > 0 ? rows[rows.length - 1]!.y + ROW_HEIGHT : 0;
+  const totalHeight = rows.length > 0 ? rows[rows.length - 1]!.y + rowHeight : 0;
 
   // Build merge groups
   const mergeGroups = buildMergeGroups(rows);
@@ -73,7 +75,7 @@ export function Sidebar({ rows, sidebarWidth, onResizeMouseDown }: SidebarProps)
                 )}
                 style={{
                   top: row.y,
-                  height: ROW_HEIGHT,
+                  height: rowHeight,
                   width: '100%',
                 }}
               >
@@ -89,6 +91,7 @@ export function Sidebar({ rows, sidebarWidth, onResizeMouseDown }: SidebarProps)
                     }}
                     onCancel={() => setEditingRowId(null)}
                     mergeSpan={isMergeLeader ? mergeGroup.count : 1}
+                    rowHeight={rowHeight}
                   />
                 )}
               </div>
@@ -142,11 +145,14 @@ export function Sidebar({ rows, sidebarWidth, onResizeMouseDown }: SidebarProps)
         );
       })}
 
-      {/* Resize handle */}
+      {/* Resize handle — wide touch target with thin visible line */}
       <div
-        className="absolute right-0 top-0 z-20 h-full w-1 cursor-col-resize hover:bg-ring/30"
-        onMouseDown={onResizeMouseDown}
-      />
+        className="absolute top-0 z-20 h-full w-5 cursor-col-resize group"
+        style={{ touchAction: 'none', right: -10 }}
+        onPointerDown={onResizePointerDown}
+      >
+        <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-border group-hover:bg-ring/50 group-active:bg-ring transition-colors" />
+      </div>
     </div>
   );
 }
@@ -158,6 +164,7 @@ function SidebarRowName({
   onCommit,
   onCancel,
   mergeSpan,
+  rowHeight,
 }: {
   name: string;
   isEditing: boolean;
@@ -165,9 +172,11 @@ function SidebarRowName({
   onCommit: (name: string) => void;
   onCancel: () => void;
   mergeSpan: number;
+  rowHeight: number;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [value, setValue] = useState(name);
+  const lastTapRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
 
   useEffect(() => {
     if (isEditing) {
@@ -179,7 +188,7 @@ function SidebarRowName({
     }
   }, [isEditing, name]);
 
-  const spanHeight = ROW_HEIGHT * mergeSpan;
+  const spanHeight = rowHeight * mergeSpan;
 
   if (isEditing) {
     return (
@@ -198,6 +207,17 @@ function SidebarRowName({
     );
   }
 
+  const handlePointerDown = (e: React.PointerEvent) => {
+    const now = Date.now();
+    const last = lastTapRef.current;
+    if (now - last.time < 300 && Math.abs(e.clientX - last.x) < 25 && Math.abs(e.clientY - last.y) < 25) {
+      lastTapRef.current = { time: 0, x: 0, y: 0 };
+      onStartEdit();
+      return;
+    }
+    lastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
+  };
+
   return (
     <span
       className={cn(
@@ -205,6 +225,7 @@ function SidebarRowName({
         mergeSpan > 1 && 'absolute left-3 right-3 flex items-center',
       )}
       onDoubleClick={onStartEdit}
+      onPointerDown={handlePointerDown}
       style={mergeSpan > 1 ? { height: spanHeight, top: 0 } : undefined}
     >
       {name || <span className="italic opacity-40 text-xs font-normal">Double-click to name</span>}

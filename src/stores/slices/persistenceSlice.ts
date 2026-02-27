@@ -1,5 +1,6 @@
 import type { StateCreator } from 'zustand';
-import type { GanttChart, SavedChartEntry } from '@/types/gantt';
+import type { GanttChart, SavedChartEntry, ViewSettings } from '@/types/gantt';
+import type { RowSize } from './uiSlice';
 import * as persistence from '@/utils/persistence';
 
 export type PersistenceSlice = {
@@ -14,8 +15,37 @@ export type PersistenceSlice = {
   importChart: () => Promise<boolean>;
 };
 
+type PersistenceDeps = {
+  chart: GanttChart;
+  setChart: (chart: GanttChart) => void;
+  monthWidth: number;
+  sidebarWidth: number;
+  rowSize: RowSize;
+  showQuarters: boolean;
+  setMonthWidth: (width: number) => void;
+  setSidebarWidth: (width: number) => void;
+  setRowSize: (size: RowSize) => void;
+  setShowQuarters: (show: boolean) => void;
+};
+
+function snapshotViewSettings(state: PersistenceDeps): ViewSettings {
+  return {
+    sidebarWidth: state.sidebarWidth,
+    monthWidth: state.monthWidth,
+    rowSize: state.rowSize,
+    showQuarters: state.showQuarters,
+  };
+}
+
+function applyViewSettings(state: PersistenceDeps, vs: ViewSettings) {
+  state.setMonthWidth(vs.monthWidth);
+  state.setSidebarWidth(vs.sidebarWidth);
+  state.setRowSize(vs.rowSize);
+  state.setShowQuarters(vs.showQuarters);
+}
+
 export const createPersistenceSlice: StateCreator<
-  PersistenceSlice & { chart: GanttChart; setChart: (chart: GanttChart) => void },
+  PersistenceSlice & PersistenceDeps,
   [['zustand/immer', never]],
   [],
   PersistenceSlice
@@ -29,11 +59,12 @@ export const createPersistenceSlice: StateCreator<
     }),
 
   saveCurrentChart: () => {
-    const chart = get().chart;
+    const state = get();
+    const chart = { ...state.chart, viewSettings: snapshotViewSettings(state) };
     persistence.saveChart(chart);
-    set((state) => {
-      state.lastSavedAt = new Date().toISOString();
-      state.savedCharts = persistence.listSavedCharts();
+    set((s) => {
+      s.lastSavedAt = new Date().toISOString();
+      s.savedCharts = persistence.listSavedCharts();
     });
   },
 
@@ -41,6 +72,9 @@ export const createPersistenceSlice: StateCreator<
     const chart = persistence.loadChart(id);
     if (chart) {
       get().setChart(chart);
+      if (chart.viewSettings) {
+        applyViewSettings(get(), chart.viewSettings);
+      }
     }
   },
 
@@ -52,7 +86,8 @@ export const createPersistenceSlice: StateCreator<
   },
 
   exportChart: () => {
-    const chart = get().chart;
+    const state = get();
+    const chart = { ...state.chart, viewSettings: snapshotViewSettings(state) };
     persistence.exportChartToFile(chart);
   },
 
@@ -60,6 +95,9 @@ export const createPersistenceSlice: StateCreator<
     const chart = await persistence.importChartFromFile();
     if (chart) {
       get().setChart(chart);
+      if (chart.viewSettings) {
+        applyViewSettings(get(), chart.viewSettings);
+      }
       return true;
     }
     return false;

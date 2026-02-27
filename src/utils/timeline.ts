@@ -1,34 +1,7 @@
 import { MONTH_NAMES_SHORT, QUARTER_NAMES } from '@/constants/timeline';
 
-export function monthToPixelX(monthIndex: number, monthWidth: number): number {
-  return monthIndex * monthWidth;
-}
-
-export function pixelXToMonth(px: number, monthWidth: number): number {
-  return Math.round(px / monthWidth);
-}
-
-export function snapToMonth(px: number, monthWidth: number): number {
-  return Math.round(px / monthWidth) * monthWidth;
-}
-
 export function getTotalMonths(startYear: number, endYear: number, startMonth = 1, endMonth = 12): number {
   return (endYear - startYear) * 12 + (endMonth - startMonth + 1);
-}
-
-export function monthIndexToLabel(monthIndex: number, startYear: number, startMonth = 1): string {
-  const absoluteMonth = (startMonth - 1) + monthIndex;
-  const month = absoluteMonth % 12;
-  const year = startYear + Math.floor(absoluteMonth / 12);
-  return `${MONTH_NAMES_SHORT[month]} ${year}`;
-}
-
-export function monthIndexToDate(monthIndex: number, startYear: number, startMonth = 1): { month: number; year: number } {
-  const absoluteMonth = (startMonth - 1) + monthIndex;
-  return {
-    month: absoluteMonth % 12,
-    year: startYear + Math.floor(absoluteMonth / 12),
-  };
 }
 
 export type YearHeader = { year: number; startMonth: number; spanMonths: number };

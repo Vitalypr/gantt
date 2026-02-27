@@ -1,6 +1,6 @@
 import { useRef, useMemo, useEffect, useState } from 'react';
 import { useStore } from '@/stores';
-import { HEADER_HEIGHT, ROW_HEIGHT } from '@/constants/timeline';
+import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { getTotalMonths } from '@/utils/timeline';
 import { TimelineHeader } from '@/components/Timeline/TimelineHeader';
 import { TimelineGrid } from '@/components/Timeline/TimelineGrid';
@@ -35,6 +35,7 @@ export function GanttChart() {
   const addRow = useStore((s) => s.addRow);
   const setEffectiveMonthWidth = useStore((s) => s.setEffectiveMonthWidth);
 
+  const sidebarLastTapRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
   const dragCreate = useDragCreate();
   const dragMove = useDragMove();
   const dragResize = useDragResize();
@@ -70,6 +71,11 @@ export function GanttChart() {
 
   const timelineWidth = totalMonths * effectiveMonthWidth;
 
+  const dependencyMode = useStore((s) => s.dependencyMode);
+  const showQuarters = useStore((s) => s.showQuarters);
+  const rowSize = useStore((s) => s.rowSize);
+  const rowHeight = ROW_SIZE_MAP[rowSize];
+
   const rowLayout = useMemo(() => {
     const rows: RowLayout[] = [];
     let y = 0;
@@ -81,14 +87,14 @@ export function GanttChart() {
         y,
         mergedWithNext: row.mergedWithNext,
       });
-      y += ROW_HEIGHT;
+      y += rowHeight;
     }
     return { rows, totalHeight: y };
-  }, [chartRows]);
-
-  const dependencyMode = useStore((s) => s.dependencyMode);
+  }, [chartRows, rowHeight]);
   const dragConnect = useDragConnect(rowLayout.rows, effectiveMonthWidth);
 
+  const TIER_HEIGHT = 28;
+  const headerHeight = showQuarters ? TIER_HEIGHT * 3 : TIER_HEIGHT * 2;
   const bodyHeight = Math.max(rowLayout.totalHeight, 300);
   const hasRows = chartRows.length > 0;
 
@@ -102,13 +108,13 @@ export function GanttChart() {
         className="grid"
         style={{
           gridTemplateColumns: `${sidebarWidth}px ${timelineWidth}px`,
-          gridTemplateRows: `${HEADER_HEIGHT}px ${bodyHeight}px`,
+          gridTemplateRows: `${headerHeight}px ${bodyHeight}px`,
         }}
       >
         {/* Top-left corner: sticky top + left */}
         <div
           className="sticky left-0 top-0 z-30 border-b border-r bg-background"
-          style={{ width: sidebarWidth, height: HEADER_HEIGHT }}
+          style={{ width: sidebarWidth, height: headerHeight }}
         />
 
         {/* Timeline header: sticky top */}
@@ -120,6 +126,7 @@ export function GanttChart() {
             chartEndMonth={endMonth}
             monthWidth={effectiveMonthWidth}
             totalWidth={timelineWidth}
+            showQuarters={showQuarters}
           />
         </div>
 
@@ -132,11 +139,23 @@ export function GanttChart() {
               addRow();
             }
           }}
+          onPointerDown={(e) => {
+            // Double-tap detection for touch (dblclick doesn't fire on touch)
+            if ((e.target as HTMLElement).closest('[data-sidebar-row]')) return;
+            const now = Date.now();
+            const last = sidebarLastTapRef.current;
+            if (now - last.time < 300 && Math.abs(e.clientX - last.x) < 25 && Math.abs(e.clientY - last.y) < 25) {
+              sidebarLastTapRef.current = { time: 0, x: 0, y: 0 };
+              addRow();
+              return;
+            }
+            sidebarLastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
+          }}
         >
           <Sidebar
             rows={rowLayout.rows}
             sidebarWidth={sidebarWidth}
-            onResizeMouseDown={resizeSidebar.onMouseDown}
+            onResizePointerDown={resizeSidebar.onPointerDown}
           />
         </div>
 
@@ -158,7 +177,7 @@ export function GanttChart() {
             dragMove={dragMove}
             dragResize={dragResize}
             dragRowSpan={dragRowSpan}
-            onAnchorMouseDown={dependencyMode ? dragConnect.onAnchorMouseDown : undefined}
+            onAnchorPointerDown={dependencyMode ? dragConnect.onAnchorPointerDown : undefined}
           />
           {dependencyMode && (
             <DependencyLayer

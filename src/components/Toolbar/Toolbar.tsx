@@ -8,13 +8,14 @@ import {
   Download,
   Upload,
   Plus,
-  CalendarDays,
+  Maximize2,
   FolderOpen,
   GanttChart as GanttIcon,
   Waypoints,
   HelpCircle,
   Sun,
   Moon,
+  Rows3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +24,6 @@ import { useStore } from '@/stores';
 import { useUndo, useRedo } from '@/stores/hooks';
 import { MIN_MONTH_WIDTH, MAX_MONTH_WIDTH } from '@/constants/timeline';
 import { MONTH_NAMES_SHORT } from '@/constants/timeline';
-import { getCurrentMonthIndex } from '@/utils/timeline';
 import { SaveDialog } from '@/components/Dialogs/SaveDialog';
 import { AddRowDialog } from '@/components/Dialogs/AddRowDialog';
 import { HelpDialog } from '@/components/Dialogs/HelpDialog';
@@ -54,6 +54,10 @@ export function Toolbar() {
   const setDateRange = useStore((s) => s.setDateRange);
   const dependencyMode = useStore((s) => s.dependencyMode);
   const setDependencyMode = useStore((s) => s.setDependencyMode);
+  const showQuarters = useStore((s) => s.showQuarters);
+  const setShowQuarters = useStore((s) => s.setShowQuarters);
+  const rowSize = useStore((s) => s.rowSize);
+  const setRowSize = useStore((s) => s.setRowSize);
 
   const undo = useUndo();
   const redo = useRedo();
@@ -77,15 +81,17 @@ export function Toolbar() {
     }
   };
 
-  const scrollToToday = () => {
-    const todayIndex = getCurrentMonthIndex(startYear, startMonth);
+  const setMonthWidth = useStore((s) => s.setMonthWidth);
+
+  const fitToView = () => {
     const scrollContainer = document.querySelector('[data-gantt-scroll]');
-    if (scrollContainer) {
-      const sw = useStore.getState().sidebarWidth;
-      const mw = useStore.getState().effectiveMonthWidth;
-      const targetX = todayIndex * mw - scrollContainer.clientWidth / 2 + sw;
-      scrollContainer.scrollTo({ left: Math.max(0, targetX), behavior: 'smooth' });
-    }
+    if (!scrollContainer) return;
+    const totalMonths = (endYear - startYear) * 12 + (endMonth - startMonth + 1);
+    if (totalMonths <= 0) return;
+    const sw = useStore.getState().sidebarWidth;
+    const availableWidth = scrollContainer.clientWidth - sw;
+    const ideal = Math.floor(availableWidth / totalMonths);
+    setMonthWidth(Math.max(MIN_MONTH_WIDTH, Math.min(MAX_MONTH_WIDTH, ideal)));
   };
 
   const handleImport = async () => {
@@ -134,39 +140,38 @@ export function Toolbar() {
 
   return (
     <TooltipProvider delayDuration={400}>
-      <div className="flex h-11 shrink-0 items-center border-b border-border/60 bg-surface px-3">
+      <div className="flex h-11 shrink-0 items-center border-b border-border/60 bg-surface px-3 overflow-x-auto scrollbar-hide">
         {/* Brand + Chart name */}
         <div className="flex items-center gap-2.5 mr-1">
-          <div className="flex items-center gap-1.5 text-primary">
+          <div className="hidden lg:flex items-center gap-1.5 text-primary">
             <GanttIcon className="h-4 w-4" strokeWidth={2.5} />
-            <span className="text-[11px] font-bold tracking-wide uppercase text-primary/70 hidden sm:inline">High Level Gantt Chart</span>
-            <span className="text-[11px] font-bold tracking-wide uppercase text-primary/70 sm:hidden">Gantt</span>
+            <span className="text-[11px] font-bold tracking-wide uppercase text-primary/70">High Level Gantt Chart</span>
           </div>
-          <div className="h-4 w-px bg-border" />
+          <div className="hidden lg:block h-4 w-px bg-border" />
           <Input
             ref={nameInputRef}
             defaultValue={chartName}
             key={chartName}
             onBlur={handleNameBlur}
             onKeyDown={handleNameKeyDown}
-            className="h-7 w-52 border-transparent bg-transparent px-1.5 text-[13px] font-semibold tracking-tight text-foreground hover:bg-muted focus:bg-muted focus:border-transparent"
+            className="h-7 w-28 lg:w-52 border-transparent bg-transparent px-1.5 text-[13px] font-semibold tracking-tight text-foreground hover:bg-muted focus:bg-muted focus:border-transparent"
           />
         </div>
 
         <ToolbarSeparator />
 
-        {/* Add Row */}
+        {/* Add Row — hidden on mobile */}
         <ToolbarGroup>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1.5 px-2.5 text-xs font-medium"
+                className="hidden lg:inline-flex h-7 gap-1.5 px-2.5 text-xs font-medium"
                 onClick={() => setAddRowDialogOpen(true)}
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Row</span>
+                <span className="hidden lg:inline">Row</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>Add Row</TooltipContent>
@@ -175,9 +180,10 @@ export function Toolbar() {
 
         <ToolbarSeparator />
 
-        {/* Date range controls */}
+        {/* Date range controls — stacked on mobile, inline on desktop */}
         <ToolbarGroup>
-          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          {/* Desktop: horizontal layout */}
+          <div className="hidden lg:flex items-center gap-1 text-[10px] text-muted-foreground">
             <select
               value={startMonth}
               onChange={(e) => handleStartMonthChange(e.target.value)}
@@ -214,6 +220,44 @@ export function Toolbar() {
               max={2100}
             />
           </div>
+          {/* Mobile: month + year in one row */}
+          <div className="flex lg:hidden items-center gap-0.5 text-[10px] text-muted-foreground">
+            <select
+              value={startMonth}
+              onChange={(e) => handleStartMonthChange(e.target.value)}
+              className="h-5 rounded border border-border/60 bg-surface px-0.5 text-[9px] text-foreground outline-none cursor-pointer"
+            >
+              {MONTH_NAMES_SHORT.map((name, i) => (
+                <option key={i} value={i + 1}>{name}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              value={startYear}
+              onChange={(e) => handleStartYearChange(e.target.value)}
+              className="h-5 w-11 rounded border border-border/60 bg-surface px-0.5 text-[9px] text-foreground outline-none text-center tabular-nums"
+              min={2000}
+              max={2100}
+            />
+            <span className="text-muted-foreground/60">&ndash;</span>
+            <select
+              value={endMonth}
+              onChange={(e) => handleEndMonthChange(e.target.value)}
+              className="h-5 rounded border border-border/60 bg-surface px-0.5 text-[9px] text-foreground outline-none cursor-pointer"
+            >
+              {MONTH_NAMES_SHORT.map((name, i) => (
+                <option key={i} value={i + 1}>{name}</option>
+              ))}
+            </select>
+            <input
+              type="number"
+              value={endYear}
+              onChange={(e) => handleEndYearChange(e.target.value)}
+              className="h-5 w-11 rounded border border-border/60 bg-surface px-0.5 text-[9px] text-foreground outline-none text-center tabular-nums"
+              min={2000}
+              max={2100}
+            />
+          </div>
         </ToolbarGroup>
 
         <ToolbarSeparator />
@@ -229,7 +273,7 @@ export function Toolbar() {
             <TooltipContent>Zoom Out</TooltipContent>
           </Tooltip>
 
-          <span className="min-w-[2.5rem] text-center text-[10px] font-medium tabular-nums text-muted-foreground/70">
+          <span className="hidden lg:inline min-w-[2.5rem] text-center text-[10px] font-medium tabular-nums text-muted-foreground/70">
             {Math.round(effectiveMonthWidth)}px
           </span>
 
@@ -245,14 +289,47 @@ export function Toolbar() {
 
         <ToolbarSeparator />
 
-        {/* Today button */}
+        {/* Fit to view */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={scrollToToday}>
-              <CalendarDays className="h-3.5 w-3.5" />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fitToView}>
+              <Maximize2 className="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Scroll to Today</TooltipContent>
+          <TooltipContent>Fit Chart to View</TooltipContent>
+        </Tooltip>
+
+        {/* Quarter row toggle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={showQuarters ? 'default' : 'ghost'}
+              size="icon"
+              className="h-7 w-7 text-[11px] font-bold"
+              onClick={() => setShowQuarters(!showQuarters)}
+            >
+              Qr
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{showQuarters ? 'Hide Quarters' : 'Show Quarters'}</TooltipContent>
+        </Tooltip>
+
+        {/* Row height cycle */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => {
+                const next = rowSize === 'small' ? 'medium' : rowSize === 'medium' ? 'large' : 'small';
+                setRowSize(next);
+              }}
+            >
+              <Rows3 className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Row Height: {rowSize === 'small' ? 'Small' : rowSize === 'medium' ? 'Medium' : 'Large'}</TooltipContent>
         </Tooltip>
 
         <ToolbarSeparator />
@@ -263,17 +340,17 @@ export function Toolbar() {
             <Button
               variant={dependencyMode ? 'default' : 'ghost'}
               size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs font-medium"
+              className="h-7 gap-1.5 px-1.5 lg:px-2.5 text-xs font-medium"
               onClick={() => setDependencyMode(!dependencyMode)}
             >
               <Waypoints className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Connect</span>
+              <span className="hidden lg:inline">Connect</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent>Toggle Dependency Mode</TooltipContent>
         </Tooltip>
 
-        <div className="flex-1" />
+        <div className="hidden lg:block lg:flex-1" />
 
         {/* Undo/Redo */}
         <ToolbarGroup>

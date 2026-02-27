@@ -13,6 +13,8 @@ export type SelectedDependency = {
   dependencyId: string;
 };
 
+export type RowSize = 'small' | 'medium' | 'large';
+
 export type UiSlice = {
   monthWidth: number;
   effectiveMonthWidth: number;
@@ -21,6 +23,8 @@ export type UiSlice = {
   editingActivity: EditingActivity | null;
   selectedDependency: SelectedDependency | null;
   dependencyMode: boolean;
+  showQuarters: boolean;
+  rowSize: RowSize;
 
   zoomIn: () => void;
   zoomOut: () => void;
@@ -31,6 +35,8 @@ export type UiSlice = {
   setEditingActivity: (editing: EditingActivity | null) => void;
   selectDependency: (selection: SelectedDependency | null) => void;
   setDependencyMode: (enabled: boolean) => void;
+  setShowQuarters: (show: boolean) => void;
+  setRowSize: (size: RowSize) => void;
 };
 
 export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []> = (set) => ({
@@ -41,15 +47,19 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   editingActivity: null,
   selectedDependency: null,
   dependencyMode: false,
+  showQuarters: true,
+  rowSize: 'medium' as RowSize,
 
   zoomIn: () =>
     set((state) => {
-      state.monthWidth = Math.min(MAX_MONTH_WIDTH, state.monthWidth + ZOOM_STEP);
+      const step = state.monthWidth < 20 ? 2 : ZOOM_STEP;
+      state.monthWidth = Math.min(MAX_MONTH_WIDTH, state.monthWidth + step);
     }),
 
   zoomOut: () =>
     set((state) => {
-      state.monthWidth = Math.max(MIN_MONTH_WIDTH, state.monthWidth - ZOOM_STEP);
+      const step = state.monthWidth <= 20 ? 2 : ZOOM_STEP;
+      state.monthWidth = Math.max(MIN_MONTH_WIDTH, state.monthWidth - step);
     }),
 
   setMonthWidth: (width) =>
@@ -90,5 +100,15 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   setDependencyMode: (enabled) =>
     set((state) => {
       state.dependencyMode = enabled;
+    }),
+
+  setShowQuarters: (show) =>
+    set((state) => {
+      state.showQuarters = show;
+    }),
+
+  setRowSize: (size) =>
+    set((state) => {
+      state.rowSize = size;
     }),
 });
