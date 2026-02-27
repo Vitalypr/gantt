@@ -33,7 +33,7 @@ function createDefaultChart(): GanttChart {
     startMonth: 1,
     endYear: currentYear + 2,
     endMonth: 12,
-    rows: [],
+    rows: [{ id: nanoid(), name: '', order: 0, activityIds: [] }],
     activities: [],
     dependencies: [],
     createdAt: now.toISOString(),
