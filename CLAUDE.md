@@ -46,7 +46,8 @@ Undo/redo via zundo `temporal` middleware, partializes only `chart` state (50 hi
 
 - **`Activity.startMonth`** — offset from chart start (month index 0-based). When chart start date changes, all activities are shifted to preserve calendar position.
 - **`Activity.isMilestone`** — renders as diamond instead of bar
-- **`Activity.rowSpan`** — 1 (default) or 2 rows
+- **`Activity.rowSpan`** — number of rows to span (1 = default, unlimited upward/downward)
+- **`Activity.annotation`** — optional text note, shown via message icon on the bar
 - **`GanttRow.mergedWithNext`** — visual cell merge in sidebar
 - **`Dependency`** — connects two activities via `fromSide`/`toSide` anchors (left/right/top/bottom)
 - **`GanttChart`** — root object with date range, rows, activities, dependencies
@@ -74,7 +75,7 @@ App
 | `useDragCreate` | Drag on empty timeline to create activity (double-click = 1-month) |
 | `useDragMove` | Drag activity bar horizontally (snaps to month grid) |
 | `useDragResize` | Drag left/right edge to resize duration |
-| `useDragRowSpan` | Drag bottom edge to span 2 rows |
+| `useDragRowSpan` | Drag top/bottom edge to span multiple rows |
 | `useDragConnect` | Drag from anchor dot to create dependency |
 | `useResizeSidebar` | Drag sidebar right edge to resize |
 
@@ -101,7 +102,7 @@ src/
 │   ├── Toolbar/            # Toolbar (top bar)
 │   └── ui/                 # shadcn/ui: button, context-menu, dialog, input, tooltip
 ├── constants/
-│   ├── timeline.ts         # ROW_HEIGHT=40, HEADER_HEIGHT=84, zoom limits, month names
+│   ├── timeline.ts         # ROW_SIZE_MAP, zoom limits, month names
 │   └── colors.ts           # 11 color families x 4 shades, DEFAULT_ACTIVITY_COLOR
 ├── hooks/                  # Drag hooks, keyboard shortcuts, auto-save, sidebar resize
 ├── lib/
@@ -133,8 +134,7 @@ launcher/
 
 | Constant | Value | Usage |
 |----------|-------|-------|
-| `ROW_HEIGHT` | 40px | Row height in timeline |
-| `HEADER_HEIGHT` | 84px | 3 tiers x 28px |
+| `ROW_SIZE_MAP` | small=28, medium=40, large=56 | Configurable row heights |
 | `DEFAULT_MONTH_WIDTH` | 80px | Initial zoom level |
 | `MIN_MONTH_WIDTH` | 20px | Min zoom |
 | `MAX_MONTH_WIDTH` | 180px | Max zoom |
@@ -146,13 +146,15 @@ launcher/
 ## Features
 
 1. **Rows** — Add, rename, delete, reorder, merge name cells
-2. **Activities** — Create by drag/double-click, move, resize, row-span, color, inline rename
-3. **Milestones** — Diamond markers, convert to/from activity via context menu
-4. **Dependencies** — Toggle connect mode, drag anchor-to-anchor, orthogonal SVG arrows
-5. **Timeline** — Year/quarter/month headers, zoom, today marker, date range picker
+2. **Activities** — Create by drag/double-click, move, resize, multi-row span (top/bottom), color, inline rename, annotations
+3. **Milestones** — Diamond markers (scale with row height), convert to/from activity via context menu
+4. **Dependencies** — Toggle connect mode, drag anchor-to-anchor, orthogonal SVG arrows, right-click delete
+5. **Timeline** — Year/quarter/month headers, zoom, fit-to-view, today marker, date range picker, row height cycling (S/M/L)
 6. **Undo/Redo** — 50-step history (Ctrl+Z / Ctrl+Shift+Z)
-7. **Persistence** — Auto-save, manual save, load, export/import JSON
+7. **Persistence** — Auto-save, manual save, load, export/import JSON (includes ViewSettings)
 8. **Keyboard** — Ctrl+Z, Ctrl+Y, Delete, Escape, Enter
+9. **Touch/Mobile** — Pointer events for all drags, double-tap support, PWA fullscreen
+10. **Display** — Row height cycling (small/medium/large), quarter toggle, fit-to-view zoom
 
 ---
 

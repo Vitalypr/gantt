@@ -19,6 +19,8 @@ export type ChartSlice = {
   updateActivity: (activityId: string, updates: Partial<Activity>) => void;
   removeActivity: (activityId: string) => void;
 
+  reParentActivity: (activityId: string, toRowId: string) => void;
+
   addDependency: (dep: Omit<Dependency, 'id'>) => string;
   removeDependency: (id: string) => void;
 };
@@ -204,6 +206,7 @@ export const createChartSlice: StateCreator<ChartSlice, [['zustand/immer', never
         if (updates.order !== undefined) activity.order = updates.order;
         if (updates.isMilestone !== undefined) activity.isMilestone = updates.isMilestone;
         if (updates.rowSpan !== undefined) activity.rowSpan = updates.rowSpan;
+        if ('annotation' in updates) activity.annotation = updates.annotation;
         state.chart.updatedAt = new Date().toISOString();
       }
     }),
@@ -219,6 +222,24 @@ export const createChartSlice: StateCreator<ChartSlice, [['zustand/immer', never
       state.chart.dependencies = state.chart.dependencies.filter(
         (d) => d.fromActivityId !== activityId && d.toActivityId !== activityId,
       );
+      state.chart.updatedAt = new Date().toISOString();
+    }),
+
+  reParentActivity: (activityId, toRowId) =>
+    set((state) => {
+      // Remove from current row
+      for (const row of state.chart.rows) {
+        const idx = row.activityIds.indexOf(activityId);
+        if (idx >= 0) {
+          row.activityIds.splice(idx, 1);
+          break;
+        }
+      }
+      // Add to target row
+      const targetRow = state.chart.rows.find((r) => r.id === toRowId);
+      if (targetRow && !targetRow.activityIds.includes(activityId)) {
+        targetRow.activityIds.push(activityId);
+      }
       state.chart.updatedAt = new Date().toISOString();
     }),
 

@@ -174,7 +174,7 @@ body {
   right: -2px;
 }
 
-.resize-handle:not(.resize-handle--bottom)::after {
+.resize-handle:not(.resize-handle--bottom):not(.resize-handle--top)::after {
   content: '';
   position: absolute;
   top: 50%;
@@ -195,6 +195,34 @@ body {
   right: 3px;
 }
 
+/* Top resize handle for row-span */
+.resize-handle--top {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 6px;
+  bottom: auto;
+  cursor: ns-resize;
+  z-index: 2;
+  touch-action: none;
+}
+
+.resize-handle--top::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.5);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
 /* Bottom resize handle for row-span */
 .resize-handle--bottom {
   position: absolute;
@@ -206,6 +234,7 @@ body {
   top: auto;
   cursor: ns-resize;
   z-index: 2;
+  touch-action: none;
 }
 
 .resize-handle--bottom::after {

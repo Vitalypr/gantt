@@ -1,23 +1,33 @@
 import { useCallback, useRef, useState } from 'react';
 import { useStore } from '@/stores';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
+import type { RowLayout } from '@/components/GanttChart/GanttChart';
 
 const DRAG_THRESHOLD = 4;
 
-type DragRowSpanState = {
+export type DragRowSpanState = {
   activityId: string;
+  direction: 'top' | 'bottom';
   originalRowSpan: number;
   currentRowSpan: number;
+  /** Number of rows the bar has shifted upward (0 for bottom drag) */
+  topOffset: number;
 } | null;
 
-export function useDragRowSpan() {
+export function useDragRowSpan(rows: RowLayout[]) {
   const rowSize = useStore((s) => s.rowSize);
   const rowHeight = ROW_SIZE_MAP[rowSize];
   const updateActivity = useStore((s) => s.updateActivity);
+  const reParentActivity = useStore((s) => s.reParentActivity);
   const [dragState, setDragState] = useState<DragRowSpanState>(null);
   const startYRef = useRef(0);
   const isDraggingRef = useRef(false);
   const dragStateRef = useRef<DragRowSpanState>(null);
+
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const rowHeightRef = useRef(rowHeight);
+  rowHeightRef.current = rowHeight;
 
   const updateDragState = (next: DragRowSpanState) => {
     dragStateRef.current = next;
@@ -25,7 +35,7 @@ export function useDragRowSpan() {
   };
 
   const onPointerDown = useCallback(
-    (e: React.PointerEvent, activityId: string, currentRowSpan: number) => {
+    (e: React.PointerEvent, activityId: string, currentRowSpan: number, direction: 'top' | 'bottom', rowId: string) => {
       e.stopPropagation();
       startYRef.current = e.clientY;
       isDraggingRef.current = false;
@@ -35,8 +45,13 @@ export function useDragRowSpan() {
 
       document.body.style.userSelect = 'none';
 
+      // Find row index for this activity
+      const sortedRows = rowsRef.current;
+      const rowIndex = sortedRows.findIndex((r) => r.rowId === rowId);
+
       const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaY = moveEvent.clientY - startYRef.current;
+        const rh = rowHeightRef.current;
 
         if (!isDraggingRef.current) {
           if (Math.abs(deltaY) < DRAG_THRESHOLD) return;
@@ -44,25 +59,42 @@ export function useDragRowSpan() {
           document.body.style.cursor = 'ns-resize';
           updateDragState({
             activityId,
+            direction,
             originalRowSpan: currentRowSpan,
             currentRowSpan,
+            topOffset: 0,
           });
         }
 
-        // Snap to 1 or 2 based on delta crossing half-row threshold
-        const threshold = rowHeight / 2;
-        let newRowSpan: number;
-        if (currentRowSpan === 1) {
-          // Dragging from span-1: expand to 2 if dragged down past threshold
-          newRowSpan = deltaY > threshold ? 2 : 1;
-        } else {
-          // Dragging from span-2: shrink to 1 if dragged up past threshold
-          newRowSpan = deltaY < -threshold ? 1 : 2;
-        }
+        const rowDelta = Math.round(deltaY / rh);
 
-        const prev = dragStateRef.current;
-        if (prev && prev.currentRowSpan !== newRowSpan) {
-          updateDragState({ ...prev, currentRowSpan: newRowSpan });
+        if (direction === 'bottom') {
+          // Bottom edge: positive delta = expand, negative = shrink
+          const maxDown = sortedRows.length - rowIndex;
+          const newSpan = Math.max(1, Math.min(maxDown, currentRowSpan + rowDelta));
+          const prev = dragStateRef.current;
+          if (prev && prev.currentRowSpan !== newSpan) {
+            updateDragState({ ...prev, currentRowSpan: newSpan, topOffset: 0 });
+          }
+        } else {
+          // Top edge: negative delta = expand up, positive = shrink from top
+          const expandUp = Math.max(0, Math.min(rowIndex, -rowDelta));
+          const shrinkDown = Math.max(0, Math.min(currentRowSpan - 1, rowDelta));
+          let newTopOffset: number;
+          let newSpan: number;
+          if (rowDelta <= 0) {
+            // Expanding upward
+            newTopOffset = expandUp;
+            newSpan = currentRowSpan + expandUp;
+          } else {
+            // Shrinking from top
+            newTopOffset = -shrinkDown;
+            newSpan = currentRowSpan - shrinkDown;
+          }
+          const prev = dragStateRef.current;
+          if (prev && (prev.currentRowSpan !== newSpan || prev.topOffset !== newTopOffset)) {
+            updateDragState({ ...prev, currentRowSpan: newSpan, topOffset: newTopOffset });
+          }
         }
       };
 
@@ -75,10 +107,19 @@ export function useDragRowSpan() {
         if (isDraggingRef.current) {
           const prev = dragStateRef.current;
           updateDragState(null);
-          if (prev && prev.currentRowSpan !== prev.originalRowSpan) {
-            updateActivity(prev.activityId, {
-              rowSpan: prev.currentRowSpan,
-            });
+          if (prev) {
+            const changed = prev.currentRowSpan !== prev.originalRowSpan || prev.topOffset !== 0;
+            if (changed) {
+              updateActivity(prev.activityId, { rowSpan: prev.currentRowSpan });
+              // Re-parent if top offset changed
+              if (prev.topOffset !== 0) {
+                const targetIndex = rowIndex + (prev.direction === 'top' ? -prev.topOffset : 0);
+                const targetRow = sortedRows[targetIndex];
+                if (targetRow) {
+                  reParentActivity(prev.activityId, targetRow.rowId);
+                }
+              }
+            }
           }
         } else {
           updateDragState(null);
@@ -90,7 +131,7 @@ export function useDragRowSpan() {
       target.onpointermove = handlePointerMove;
       target.onpointerup = handlePointerUp;
     },
-    [updateActivity, rowHeight],
+    [updateActivity, reParentActivity],
   );
 
   return { onPointerDown, dragState };

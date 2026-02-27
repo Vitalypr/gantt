@@ -17,6 +17,7 @@ import {
   GripHorizontal,
   Palette,
   ArrowDownFromLine,
+  MessageSquareText,
   WrapText,
   ToggleLeft,
   Circle,
@@ -192,8 +193,13 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
               Right-click the activity &rarr; <span className="font-semibold text-foreground">Color</span> &rarr; pick from the palette.
             </HelpItem>
             <HelpItem icon={ArrowDownFromLine} label="Row Span">
-              Drag the bottom edge of an activity bar downward to span 2 rows. Drag back up to
-              collapse to a single row.
+              Drag the bottom or top edge of an activity bar to span multiple rows.
+              Bottom edge expands downward, top edge expands upward. Works for any number of rows.
+            </HelpItem>
+            <HelpItem icon={MessageSquareText} label="Annotations">
+              Right-click an activity &rarr; <span className="font-semibold text-foreground">Add Annotation</span> to
+              attach a note. A small message icon appears in the top-left corner. Click the icon to
+              view or edit. Clear the text to remove the annotation.
             </HelpItem>
             <HelpItem icon={WrapText} label="Text Wrapping">
               Long activity names automatically wrap to multiple lines within the bar.

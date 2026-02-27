@@ -132,10 +132,13 @@ export function TimelineBody({
               }
 
               const activityRowSpan = activity.rowSpan ?? 1;
-              const rowSpanOverride =
-                dragRowSpan.dragState?.activityId === activity.id
-                  ? dragRowSpan.dragState.currentRowSpan
-                  : null;
+              const isDraggingThisSpan = dragRowSpan.dragState?.activityId === activity.id;
+              const rowSpanOverride = isDraggingThisSpan
+                ? dragRowSpan.dragState!.currentRowSpan
+                : null;
+              const topOffsetOverride = isDraggingThisSpan
+                ? dragRowSpan.dragState!.topOffset
+                : null;
 
               return (
                 <ActivityBar
@@ -148,6 +151,7 @@ export function TimelineBody({
                   resizeOverride={resizeOverride}
                   rowSpan={activityRowSpan}
                   rowSpanOverride={rowSpanOverride}
+                  topOffsetOverride={topOffsetOverride}
                   onSelect={() => selectActivity({ activityId: activity.id })}
                   onDoubleClick={() => setEditingActivity({ activityId: activity.id })}
                   onDragMoveStart={(e) => dragMove.onPointerDown(e, activity.id, activity.startMonth)}
@@ -160,7 +164,7 @@ export function TimelineBody({
                       activity.durationMonths,
                     )
                   }
-                  onDragRowSpanStart={(e) => dragRowSpan.onPointerDown(e, activity.id, activityRowSpan)}
+                  onDragRowSpanStart={(e, direction) => dragRowSpan.onPointerDown(e, activity.id, activityRowSpan, direction, row.rowId)}
                   onAnchorPointerDown={onAnchorPointerDown}
                 />
               );
