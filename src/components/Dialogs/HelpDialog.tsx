@@ -272,9 +272,15 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
               &rarr; <span className="font-semibold text-foreground">Large</span> (56px).
               Activities, milestones, and grid all scale accordingly.
             </HelpItem>
+            <HelpItem icon={Calendar} label="Months / Weeks Mode">
+              Use the <span className="font-semibold text-foreground">Mo</span> / <span className="font-semibold text-foreground">Wk</span> toggle
+              in the toolbar to switch between months and weeks timeline modes. Each mode has
+              independent data &mdash; activities in one mode don&apos;t affect the other.
+              Duration labels show <code className="rounded bg-muted px-1 text-[11px]">3m</code> or <code className="rounded bg-muted px-1 text-[11px]">3w</code> accordingly.
+            </HelpItem>
             <HelpItem icon={Calendar} label="Quarter Row">
               Click the <span className="font-semibold text-foreground">Qr</span> button to show
-              or hide the quarter tier (Q1/Q2/Q3/Q4) in the timeline header.
+              or hide the quarter tier (Q1/Q2/Q3/Q4) in the timeline header (months mode only).
             </HelpItem>
             <HelpItem icon={Move} label="Scroll">
               Mouse scroll, trackpad, or touch drag to navigate the chart.
@@ -374,7 +380,8 @@ export function HelpDialog({ open, onOpenChange }: HelpDialogProps) {
               <p className="text-[12px] leading-relaxed text-muted-foreground">
                 <span className="font-semibold text-foreground">Duration label</span> &mdash; each
                 activity bar shows its duration in the bottom-right corner (e.g.{' '}
-                <code className="rounded bg-muted px-1 text-[11px]">3m</code>).
+                <code className="rounded bg-muted px-1 text-[11px]">3m</code> in months mode or{' '}
+                <code className="rounded bg-muted px-1 text-[11px]">3w</code> in weeks mode).
               </p>
             </div>
             <div className="flex gap-2 items-start">

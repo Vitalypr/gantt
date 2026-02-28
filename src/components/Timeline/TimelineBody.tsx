@@ -38,7 +38,7 @@ export function TimelineBody({
 }: TimelineBodyProps) {
   const rowSize = useStore((s) => s.rowSize);
   const rowHeight = ROW_SIZE_MAP[rowSize];
-  const allActivities = useStore((s) => s.chart.activities);
+  const allActivities = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.activities : s.chart.activities);
   const selectedActivity = useStore((s) => s.selectedActivity);
   const selectActivity = useStore((s) => s.selectActivity);
   const editingActivity = useStore((s) => s.editingActivity);

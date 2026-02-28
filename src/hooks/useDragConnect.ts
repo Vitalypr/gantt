@@ -33,7 +33,7 @@ export function useDragConnect(rows: RowLayout[], monthWidth: number) {
   const addDependency = useStore((s) => s.addDependency);
   const addDependencyRef = useRef(addDependency);
   addDependencyRef.current = addDependency;
-  const activities = useStore((s) => s.chart.activities);
+  const activities = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.activities : s.chart.activities);
 
   const rowsRef = useRef(rows);
   rowsRef.current = rows;

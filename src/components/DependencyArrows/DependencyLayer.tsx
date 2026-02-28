@@ -33,8 +33,8 @@ export function DependencyLayer({
 }: DependencyLayerProps) {
   const rowSize = useStore((s) => s.rowSize);
   const rowHeight = ROW_SIZE_MAP[rowSize];
-  const activities = useStore((s) => s.chart.activities);
-  const dependencies = useStore((s) => s.chart.dependencies);
+  const activities = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.activities : s.chart.activities);
+  const dependencies = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.dependencies : s.chart.dependencies);
   const selectedDependency = useStore((s) => s.selectedDependency);
   const selectDependency = useStore((s) => s.selectDependency);
   const removeDependency = useStore((s) => s.removeDependency);

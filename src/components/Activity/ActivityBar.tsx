@@ -60,6 +60,7 @@ export function ActivityBar({
   const removeActivity = useStore((s) => s.removeActivity);
   const selectActivity = useStore((s) => s.selectActivity);
   const setEditingActivity = useStore((s) => s.setEditingActivity);
+  const timelineMode = useStore((s) => s.timelineMode);
 
   const { inputRef, editValue, setEditValue, commitEdit, handleEditKeyDown } = useInlineEdit(activity.id, activity.name, isEditing);
   const checkDoubleTap = useDoubleTap();
@@ -202,7 +203,7 @@ export function ActivityBar({
               className="absolute bottom-0.5 right-1 text-[9px] font-medium leading-none opacity-60"
               style={{ color: isDark ? '#ffffff' : '#0f172a' }}
             >
-              {duration}m
+              {duration}{timelineMode === 'weeks' ? 'w' : 'm'}
             </span>
           )}
 

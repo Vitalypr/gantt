@@ -2,7 +2,7 @@ import type { TemporalState } from 'zundo';
 import { useStore } from './index';
 import type { StoreState } from './index';
 
-type PartializedState = Pick<StoreState, 'chart'>;
+type PartializedState = Pick<StoreState, 'chart' | 'weeksChart'>;
 
 export function useTemporalStore() {
   return useStore.temporal as unknown as {

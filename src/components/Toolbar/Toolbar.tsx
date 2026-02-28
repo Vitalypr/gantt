@@ -22,8 +22,9 @@ import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStore } from '@/stores';
 import { useUndo, useRedo } from '@/stores/hooks';
-import { MIN_MONTH_WIDTH, MAX_MONTH_WIDTH } from '@/constants/timeline';
+import { MIN_MONTH_WIDTH, MAX_MONTH_WIDTH, MIN_WEEK_WIDTH, MAX_WEEK_WIDTH } from '@/constants/timeline';
 import { MONTH_NAMES_SHORT } from '@/constants/timeline';
+import { getTotalMonths, getTotalWeeks } from '@/utils/timeline';
 import { SaveDialog } from '@/components/Dialogs/SaveDialog';
 import { AddRowDialog } from '@/components/Dialogs/AddRowDialog';
 import { HelpDialog } from '@/components/Dialogs/HelpDialog';
@@ -38,19 +39,24 @@ function ToolbarGroup({ children }: { children: React.ReactNode }) {
 }
 
 export function Toolbar() {
-  const chartName = useStore((s) => s.chart.name);
+  const timelineMode = useStore((s) => s.timelineMode);
+  const setTimelineMode = useStore((s) => s.setTimelineMode);
+
+  const chartName = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.name : s.chart.name);
   const setChartName = useStore((s) => s.setChartName);
-  const monthWidth = useStore((s) => s.monthWidth);
-  const effectiveMonthWidth = useStore((s) => s.effectiveMonthWidth);
+
+  const monthWidth = useStore((s) => s.timelineMode === 'weeks' ? s.weekWidth : s.monthWidth);
+  const effectiveUnitWidth = useStore((s) => s.timelineMode === 'weeks' ? s.effectiveWeekWidth : s.effectiveMonthWidth);
   const zoomIn = useStore((s) => s.zoomIn);
   const zoomOut = useStore((s) => s.zoomOut);
   const saveCurrentChart = useStore((s) => s.saveCurrentChart);
   const exportChart = useStore((s) => s.exportChart);
   const importChart = useStore((s) => s.importChart);
-  const startYear = useStore((s) => s.chart.startYear);
-  const startMonth = useStore((s) => s.chart.startMonth);
-  const endYear = useStore((s) => s.chart.endYear);
-  const endMonth = useStore((s) => s.chart.endMonth);
+
+  const startYear = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.startYear : s.chart.startYear);
+  const startMonth = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.startMonth : s.chart.startMonth);
+  const endYear = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.endYear : s.chart.endYear);
+  const endMonth = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.endMonth : s.chart.endMonth);
   const setDateRange = useStore((s) => s.setDateRange);
   const dependencyMode = useStore((s) => s.dependencyMode);
   const setDependencyMode = useStore((s) => s.setDependencyMode);
@@ -68,6 +74,9 @@ export function Toolbar() {
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { theme, toggleTheme } = useTheme();
 
+  const minWidth = timelineMode === 'weeks' ? MIN_WEEK_WIDTH : MIN_MONTH_WIDTH;
+  const maxWidth = timelineMode === 'weeks' ? MAX_WEEK_WIDTH : MAX_MONTH_WIDTH;
+
   const handleNameBlur = () => {
     const value = nameInputRef.current?.value.trim();
     if (value && value !== chartName) {
@@ -82,16 +91,27 @@ export function Toolbar() {
   };
 
   const setMonthWidth = useStore((s) => s.setMonthWidth);
+  const setWeekWidth = useStore((s) => s.setWeekWidth);
 
   const fitToView = () => {
     const scrollContainer = document.querySelector('[data-gantt-scroll]');
     if (!scrollContainer) return;
-    const totalMonths = (endYear - startYear) * 12 + (endMonth - startMonth + 1);
-    if (totalMonths <= 0) return;
+
+    const totalUnits = timelineMode === 'weeks'
+      ? getTotalWeeks(startYear, endYear, startMonth, endMonth)
+      : getTotalMonths(startYear, endYear, startMonth, endMonth);
+    if (totalUnits <= 0) return;
+
     const sw = useStore.getState().sidebarWidth;
     const availableWidth = scrollContainer.clientWidth - sw;
-    const ideal = Math.floor(availableWidth / totalMonths);
-    setMonthWidth(Math.max(MIN_MONTH_WIDTH, Math.min(MAX_MONTH_WIDTH, ideal)));
+    const ideal = Math.floor(availableWidth / totalUnits);
+    const clamped = Math.max(minWidth, Math.min(maxWidth, ideal));
+
+    if (timelineMode === 'weeks') {
+      setWeekWidth(clamped);
+    } else {
+      setMonthWidth(clamped);
+    }
   };
 
   const handleImport = async () => {
@@ -104,7 +124,6 @@ export function Toolbar() {
   const handleStartYearChange = (value: string) => {
     const y = parseInt(value, 10);
     if (!isNaN(y) && y >= 2000 && y <= 2100) {
-      // Ensure start doesn't go past end
       if (y < endYear || (y === endYear && startMonth <= endMonth)) {
         setDateRange(y, startMonth, endYear, endMonth);
       }
@@ -151,12 +170,45 @@ export function Toolbar() {
           <Input
             ref={nameInputRef}
             defaultValue={chartName}
-            key={chartName}
+            key={`${chartName}-${timelineMode}`}
             onBlur={handleNameBlur}
             onKeyDown={handleNameKeyDown}
             className="h-7 w-28 lg:w-52 border-transparent bg-transparent px-1.5 text-[13px] font-semibold tracking-tight text-foreground hover:bg-muted focus:bg-muted focus:border-transparent"
           />
         </div>
+
+        <ToolbarSeparator />
+
+        {/* Timeline mode toggle */}
+        <ToolbarGroup>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex h-7 rounded-md border border-border/60 overflow-hidden">
+                <button
+                  className={`px-2 text-[10px] font-bold transition-colors ${
+                    timelineMode === 'months'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-surface text-muted-foreground hover:bg-muted'
+                  }`}
+                  onClick={() => setTimelineMode('months')}
+                >
+                  Mo
+                </button>
+                <button
+                  className={`px-2 text-[10px] font-bold transition-colors ${
+                    timelineMode === 'weeks'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-surface text-muted-foreground hover:bg-muted'
+                  }`}
+                  onClick={() => setTimelineMode('weeks')}
+                >
+                  Wk
+                </button>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>Timeline Mode: {timelineMode === 'months' ? 'Months' : 'Weeks'}</TooltipContent>
+          </Tooltip>
+        </ToolbarGroup>
 
         <ToolbarSeparator />
 
@@ -266,7 +318,7 @@ export function Toolbar() {
         <ToolbarGroup>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomOut} disabled={monthWidth <= MIN_MONTH_WIDTH}>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomOut} disabled={monthWidth <= minWidth}>
                 <ZoomOut className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -274,12 +326,12 @@ export function Toolbar() {
           </Tooltip>
 
           <span className="hidden lg:inline min-w-[2.5rem] text-center text-[10px] font-medium tabular-nums text-muted-foreground/70">
-            {Math.round(effectiveMonthWidth)}px
+            {Math.round(effectiveUnitWidth)}px
           </span>
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomIn} disabled={monthWidth >= MAX_MONTH_WIDTH}>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomIn} disabled={monthWidth >= maxWidth}>
                 <ZoomIn className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -299,20 +351,22 @@ export function Toolbar() {
           <TooltipContent>Fit Chart to View</TooltipContent>
         </Tooltip>
 
-        {/* Quarter row toggle */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={showQuarters ? 'default' : 'ghost'}
-              size="icon"
-              className="h-7 w-7 text-[11px] font-bold"
-              onClick={() => setShowQuarters(!showQuarters)}
-            >
-              Qr
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{showQuarters ? 'Hide Quarters' : 'Show Quarters'}</TooltipContent>
-        </Tooltip>
+        {/* Quarter row toggle — only visible in months mode */}
+        {timelineMode === 'months' && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={showQuarters ? 'default' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 text-[11px] font-bold"
+                onClick={() => setShowQuarters(!showQuarters)}
+              >
+                Qr
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{showQuarters ? 'Hide Quarters' : 'Show Quarters'}</TooltipContent>
+          </Tooltip>
+        )}
 
         {/* Row height cycle */}
         <Tooltip>

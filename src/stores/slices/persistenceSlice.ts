@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { GanttChart, SavedChartEntry, ViewSettings } from '@/types/gantt';
+import type { GanttChart, WeeksChart, SavedChartEntry, ViewSettings, TimelineMode } from '@/types/gantt';
 import type { RowSize } from './uiSlice';
 import * as persistence from '@/utils/persistence';
 
@@ -17,23 +17,31 @@ export type PersistenceSlice = {
 
 type PersistenceDeps = {
   chart: GanttChart;
+  weeksChart: WeeksChart;
+  timelineMode: TimelineMode;
   setChart: (chart: GanttChart) => void;
+  setWeeksChart: (chart: WeeksChart) => void;
   monthWidth: number;
+  weekWidth: number;
   sidebarWidth: number;
   rowSize: RowSize;
   showQuarters: boolean;
   setMonthWidth: (width: number) => void;
+  setWeekWidth: (width: number) => void;
   setSidebarWidth: (width: number) => void;
   setRowSize: (size: RowSize) => void;
   setShowQuarters: (show: boolean) => void;
+  setTimelineMode: (mode: TimelineMode) => void;
 };
 
 function snapshotViewSettings(state: PersistenceDeps): ViewSettings {
   return {
     sidebarWidth: state.sidebarWidth,
     monthWidth: state.monthWidth,
+    weekWidth: state.weekWidth,
     rowSize: state.rowSize,
     showQuarters: state.showQuarters,
+    timelineMode: state.timelineMode,
   };
 }
 
@@ -42,6 +50,8 @@ function applyViewSettings(state: PersistenceDeps, vs: ViewSettings) {
   state.setSidebarWidth(vs.sidebarWidth);
   state.setRowSize(vs.rowSize);
   state.setShowQuarters(vs.showQuarters);
+  if (vs.weekWidth !== undefined) state.setWeekWidth(vs.weekWidth);
+  if (vs.timelineMode) state.setTimelineMode(vs.timelineMode);
 }
 
 export const createPersistenceSlice: StateCreator<
@@ -87,14 +97,25 @@ export const createPersistenceSlice: StateCreator<
 
   exportChart: async () => {
     const state = get();
-    const chart = { ...state.chart, viewSettings: snapshotViewSettings(state) };
-    await persistence.exportChartToFile(chart);
+    // Export the active chart (based on current mode)
+    if (state.timelineMode === 'weeks') {
+      const chart = { ...state.weeksChart, viewSettings: snapshotViewSettings(state) };
+      await persistence.exportChartToFile(chart);
+    } else {
+      const chart = { ...state.chart, viewSettings: snapshotViewSettings(state) };
+      await persistence.exportChartToFile(chart);
+    }
   },
 
   importChart: async () => {
     const chart = await persistence.importChartFromFile();
     if (chart) {
-      get().setChart(chart);
+      const state = get();
+      if (state.timelineMode === 'weeks') {
+        state.setWeeksChart(chart);
+      } else {
+        state.setChart(chart);
+      }
       if (chart.viewSettings) {
         applyViewSettings(get(), chart.viewSettings);
       }

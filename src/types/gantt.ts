@@ -30,11 +30,30 @@ export type GanttRow = {
   mergedWithNext?: boolean;
 };
 
+export type TimelineMode = 'months' | 'weeks';
+
 export type ViewSettings = {
   sidebarWidth: number;
   monthWidth: number;
+  weekWidth?: number;
   rowSize: 'small' | 'medium' | 'large';
   showQuarters: boolean;
+  timelineMode?: TimelineMode;
+};
+
+export type WeeksChart = {
+  id: string;
+  name: string;
+  startYear: number;
+  startMonth: number; // 1-12
+  endYear: number;
+  endMonth: number;   // 1-12
+  rows: GanttRow[];
+  activities: Activity[];
+  dependencies: Dependency[];
+  viewSettings?: ViewSettings;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type GanttChart = {

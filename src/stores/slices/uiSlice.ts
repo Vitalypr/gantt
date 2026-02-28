@@ -1,5 +1,15 @@
 import type { StateCreator } from 'zustand';
-import { DEFAULT_MONTH_WIDTH, DEFAULT_SIDEBAR_WIDTH, MIN_MONTH_WIDTH, MAX_MONTH_WIDTH, ZOOM_STEP } from '@/constants/timeline';
+import {
+  DEFAULT_MONTH_WIDTH,
+  DEFAULT_SIDEBAR_WIDTH,
+  DEFAULT_WEEK_WIDTH,
+  MIN_MONTH_WIDTH,
+  MAX_MONTH_WIDTH,
+  MIN_WEEK_WIDTH,
+  MAX_WEEK_WIDTH,
+  ZOOM_STEP,
+} from '@/constants/timeline';
+import type { TimelineMode } from '@/types/gantt';
 
 export type SelectedActivity = {
   activityId: string;
@@ -18,6 +28,8 @@ export type RowSize = 'small' | 'medium' | 'large';
 export type UiSlice = {
   monthWidth: number;
   effectiveMonthWidth: number;
+  weekWidth: number;
+  effectiveWeekWidth: number;
   sidebarWidth: number;
   selectedActivity: SelectedActivity | null;
   editingActivity: EditingActivity | null;
@@ -25,11 +37,14 @@ export type UiSlice = {
   dependencyMode: boolean;
   showQuarters: boolean;
   rowSize: RowSize;
+  timelineMode: TimelineMode;
 
   zoomIn: () => void;
   zoomOut: () => void;
   setMonthWidth: (width: number) => void;
   setEffectiveMonthWidth: (width: number) => void;
+  setWeekWidth: (width: number) => void;
+  setEffectiveWeekWidth: (width: number) => void;
   setSidebarWidth: (width: number) => void;
   selectActivity: (selection: SelectedActivity | null) => void;
   setEditingActivity: (editing: EditingActivity | null) => void;
@@ -37,11 +52,14 @@ export type UiSlice = {
   setDependencyMode: (enabled: boolean) => void;
   setShowQuarters: (show: boolean) => void;
   setRowSize: (size: RowSize) => void;
+  setTimelineMode: (mode: TimelineMode) => void;
 };
 
 export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []> = (set) => ({
   monthWidth: DEFAULT_MONTH_WIDTH,
   effectiveMonthWidth: DEFAULT_MONTH_WIDTH,
+  weekWidth: DEFAULT_WEEK_WIDTH,
+  effectiveWeekWidth: DEFAULT_WEEK_WIDTH,
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   selectedActivity: null,
   editingActivity: null,
@@ -49,17 +67,28 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   dependencyMode: false,
   showQuarters: true,
   rowSize: 'medium' as RowSize,
+  timelineMode: 'months' as TimelineMode,
 
   zoomIn: () =>
     set((state) => {
-      const step = state.monthWidth < 20 ? 2 : ZOOM_STEP;
-      state.monthWidth = Math.min(MAX_MONTH_WIDTH, state.monthWidth + step);
+      if (state.timelineMode === 'weeks') {
+        const step = state.weekWidth < 20 ? 2 : ZOOM_STEP;
+        state.weekWidth = Math.min(MAX_WEEK_WIDTH, state.weekWidth + step);
+      } else {
+        const step = state.monthWidth < 20 ? 2 : ZOOM_STEP;
+        state.monthWidth = Math.min(MAX_MONTH_WIDTH, state.monthWidth + step);
+      }
     }),
 
   zoomOut: () =>
     set((state) => {
-      const step = state.monthWidth <= 20 ? 2 : ZOOM_STEP;
-      state.monthWidth = Math.max(MIN_MONTH_WIDTH, state.monthWidth - step);
+      if (state.timelineMode === 'weeks') {
+        const step = state.weekWidth <= 20 ? 2 : ZOOM_STEP;
+        state.weekWidth = Math.max(MIN_WEEK_WIDTH, state.weekWidth - step);
+      } else {
+        const step = state.monthWidth <= 20 ? 2 : ZOOM_STEP;
+        state.monthWidth = Math.max(MIN_MONTH_WIDTH, state.monthWidth - step);
+      }
     }),
 
   setMonthWidth: (width) =>
@@ -70,6 +99,16 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   setEffectiveMonthWidth: (width) =>
     set((state) => {
       state.effectiveMonthWidth = width;
+    }),
+
+  setWeekWidth: (width) =>
+    set((state) => {
+      state.weekWidth = Math.max(MIN_WEEK_WIDTH, Math.min(MAX_WEEK_WIDTH, width));
+    }),
+
+  setEffectiveWeekWidth: (width) =>
+    set((state) => {
+      state.effectiveWeekWidth = width;
     }),
 
   setSidebarWidth: (width) =>
@@ -110,5 +149,14 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   setRowSize: (size) =>
     set((state) => {
       state.rowSize = size;
+    }),
+
+  setTimelineMode: (mode) =>
+    set((state) => {
+      state.timelineMode = mode;
+      // Clear selection when switching modes
+      state.selectedActivity = null;
+      state.editingActivity = null;
+      state.selectedDependency = null;
     }),
 });

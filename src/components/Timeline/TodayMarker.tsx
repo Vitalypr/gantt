@@ -1,24 +1,31 @@
-import { getCurrentMonthIndex } from '@/utils/timeline';
+import { getCurrentMonthIndex, getCurrentWeekIndex } from '@/utils/timeline';
+import type { TimelineMode } from '@/types/gantt';
 
 type TodayMarkerProps = {
   startYear: number;
   chartStartMonth?: number;
-  monthWidth: number;
+  unitWidth: number;
   totalHeight: number;
+  timelineMode: TimelineMode;
 };
 
-export function TodayMarker({ startYear, chartStartMonth = 1, monthWidth, totalHeight }: TodayMarkerProps) {
-  const todayIndex = getCurrentMonthIndex(startYear, chartStartMonth);
+export function TodayMarker({ startYear, chartStartMonth = 1, unitWidth, totalHeight, timelineMode }: TodayMarkerProps) {
+  let x: number;
 
-  if (todayIndex < 0) return null;
-
-  // Calculate proportional position within the current month
-  const now = new Date();
-  const dayOfMonth = now.getDate();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const fractionOfMonth = (dayOfMonth - 1) / daysInMonth;
-
-  const x = todayIndex * monthWidth + fractionOfMonth * monthWidth;
+  if (timelineMode === 'weeks') {
+    const weekIndex = getCurrentWeekIndex(startYear, chartStartMonth);
+    if (weekIndex < 0) return null;
+    x = weekIndex * unitWidth;
+  } else {
+    const todayIndex = getCurrentMonthIndex(startYear, chartStartMonth);
+    if (todayIndex < 0) return null;
+    // Calculate proportional position within the current month
+    const now = new Date();
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const fractionOfMonth = (dayOfMonth - 1) / daysInMonth;
+    x = todayIndex * unitWidth + fractionOfMonth * unitWidth;
+  }
 
   return (
     <div

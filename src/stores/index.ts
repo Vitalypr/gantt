@@ -20,12 +20,13 @@ export const useStore = create<StoreState>()(
     {
       partialize: (state) => ({
         chart: state.chart,
+        weeksChart: state.weeksChart,
       }),
       limit: 50,
       equality: (pastState, currentState) => {
         const past = pastState as Record<string, unknown>;
         const curr = currentState as Record<string, unknown>;
-        return past['chart'] === curr['chart'];
+        return past['chart'] === curr['chart'] && past['weeksChart'] === curr['weeksChart'];
       },
     },
   ),

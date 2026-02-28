@@ -10,7 +10,7 @@ type DragMoveState = {
 } | null;
 
 export function useDragMove() {
-  const monthWidth = useStore((s) => s.effectiveMonthWidth);
+  const monthWidth = useStore((s) => s.timelineMode === 'weeks' ? s.effectiveWeekWidth : s.effectiveMonthWidth);
   const updateActivity = useStore((s) => s.updateActivity);
   const [dragState, setDragState] = useState<DragMoveState>(null);
   const startXRef = useRef(0);

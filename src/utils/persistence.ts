@@ -1,8 +1,9 @@
-import type { GanttChart, SavedChartEntry } from '@/types/gantt';
+import type { GanttChart, SavedChartEntry, WeeksChart } from '@/types/gantt';
 
 const STORAGE_PREFIX = 'gantt-chart-';
 const INDEX_KEY = 'gantt-chart-index';
 const AUTOSAVE_KEY = 'gantt-autosave';
+const WEEKS_AUTOSAVE_KEY = 'gantt-weeks-autosave';
 
 export function saveChart(chart: GanttChart): void {
   const key = STORAGE_PREFIX + chart.id;
@@ -14,12 +15,27 @@ export function autoSave(chart: GanttChart): void {
   localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(chart));
 }
 
+export function autoSaveWeeks(chart: WeeksChart): void {
+  localStorage.setItem(WEEKS_AUTOSAVE_KEY, JSON.stringify(chart));
+}
+
 export function loadAutoSave(): GanttChart | null {
   const data = localStorage.getItem(AUTOSAVE_KEY);
   if (!data) return null;
   try {
     const raw = JSON.parse(data);
     return migrateChart(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function loadWeeksAutoSave(): WeeksChart | null {
+  const data = localStorage.getItem(WEEKS_AUTOSAVE_KEY);
+  if (!data) return null;
+  try {
+    const raw = JSON.parse(data);
+    return migrateWeeksChart(raw);
   } catch {
     return null;
   }
@@ -200,10 +216,12 @@ function migrateChart(raw: Record<string, unknown>): GanttChart {
       chart.viewSettings = {
         sidebarWidth: typeof vs['sidebarWidth'] === 'number' ? vs['sidebarWidth'] : 240,
         monthWidth: typeof vs['monthWidth'] === 'number' ? vs['monthWidth'] : 80,
+        weekWidth: typeof vs['weekWidth'] === 'number' ? vs['weekWidth'] : undefined,
         rowSize: (['small', 'medium', 'large'] as const).includes(vs['rowSize'] as 'small' | 'medium' | 'large')
           ? (vs['rowSize'] as 'small' | 'medium' | 'large')
           : 'medium',
         showQuarters: typeof vs['showQuarters'] === 'boolean' ? vs['showQuarters'] : true,
+        timelineMode: vs['timelineMode'] === 'weeks' ? 'weeks' : undefined,
       };
     }
     return chart;
@@ -264,6 +282,23 @@ function migrateChart(raw: Record<string, unknown>): GanttChart {
     rows: allRows,
     activities: allActivities,
     dependencies: [],
+    createdAt: (raw['createdAt'] as string) ?? new Date().toISOString(),
+    updatedAt: (raw['updatedAt'] as string) ?? new Date().toISOString(),
+  };
+}
+
+/** Migrate a weeks chart (simple: ensure all fields have defaults) */
+function migrateWeeksChart(raw: Record<string, unknown>): WeeksChart {
+  return {
+    id: (raw['id'] as string) ?? '',
+    name: (raw['name'] as string) ?? 'Weeks Chart',
+    startYear: (raw['startYear'] as number) ?? new Date().getFullYear(),
+    startMonth: (raw['startMonth'] as number) ?? 1,
+    endYear: (raw['endYear'] as number) ?? new Date().getFullYear() + 2,
+    endMonth: (raw['endMonth'] as number) ?? 12,
+    rows: (raw['rows'] as WeeksChart['rows']) ?? [],
+    activities: (raw['activities'] as WeeksChart['activities']) ?? [],
+    dependencies: (raw['dependencies'] as WeeksChart['dependencies']) ?? [],
     createdAt: (raw['createdAt'] as string) ?? new Date().toISOString(),
     updatedAt: (raw['updatedAt'] as string) ?? new Date().toISOString(),
   };

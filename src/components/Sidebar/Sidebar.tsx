@@ -27,7 +27,7 @@ type SidebarProps = {
 export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProps) {
   const rowSize = useStore((s) => s.rowSize);
   const rowHeight = ROW_SIZE_MAP[rowSize];
-  const chartRows = useStore((s) => s.chart.rows);
+  const chartRows = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.rows : s.chart.rows);
   const addRow = useStore((s) => s.addRow);
   const renameRow = useStore((s) => s.renameRow);
   const removeRow = useStore((s) => s.removeRow);

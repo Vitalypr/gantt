@@ -2,7 +2,7 @@ import { useRef, useMemo, useEffect, useState } from 'react';
 import { useStore } from '@/stores';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
-import { getTotalMonths } from '@/utils/timeline';
+import { getTotalMonths, getTotalWeeks } from '@/utils/timeline';
 import { TimelineHeader } from '@/components/Timeline/TimelineHeader';
 import { TimelineGrid } from '@/components/Timeline/TimelineGrid';
 import { TimelineBody } from '@/components/Timeline/TimelineBody';
@@ -27,14 +27,18 @@ export type RowLayout = {
 export function GanttChart() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sidebarWidth = useStore((s) => s.sidebarWidth);
-  const monthWidth = useStore((s) => s.monthWidth);
-  const startYear = useStore((s) => s.chart.startYear);
-  const startMonth = useStore((s) => s.chart.startMonth);
-  const endYear = useStore((s) => s.chart.endYear);
-  const endMonth = useStore((s) => s.chart.endMonth);
-  const chartRows = useStore((s) => s.chart.rows);
+  const timelineMode = useStore((s) => s.timelineMode);
+
+  // Read from active chart based on mode
+  const monthWidth = useStore((s) => s.timelineMode === 'weeks' ? s.weekWidth : s.monthWidth);
+  const startYear = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.startYear : s.chart.startYear);
+  const startMonth = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.startMonth : s.chart.startMonth);
+  const endYear = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.endYear : s.chart.endYear);
+  const endMonth = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.endMonth : s.chart.endMonth);
+  const chartRows = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.rows : s.chart.rows);
   const addRow = useStore((s) => s.addRow);
   const setEffectiveMonthWidth = useStore((s) => s.setEffectiveMonthWidth);
+  const setEffectiveWeekWidth = useStore((s) => s.setEffectiveWeekWidth);
 
   const checkSidebarDoubleTap = useDoubleTap();
   const dragCreate = useDragCreate();
@@ -42,7 +46,9 @@ export function GanttChart() {
   const dragResize = useDragResize();
   const resizeSidebar = useResizeSidebar();
 
-  const totalMonths = getTotalMonths(startYear, endYear, startMonth, endMonth);
+  const totalUnits = timelineMode === 'weeks'
+    ? getTotalWeeks(startYear, endYear, startMonth, endMonth)
+    : getTotalMonths(startYear, endYear, startMonth, endMonth);
 
   // Track container width for adaptive zoom
   const [containerWidth, setContainerWidth] = useState(window.innerWidth);
@@ -60,16 +66,20 @@ export function GanttChart() {
     return () => observer.disconnect();
   }, []);
 
-  // Compute effective month width: ensure chart fills viewport
+  // Compute effective unit width: ensure chart fills viewport
   const availableWidth = containerWidth - sidebarWidth;
-  const fitWidth = availableWidth / totalMonths;
-  const effectiveMonthWidth = Math.max(monthWidth, fitWidth);
+  const fitWidth = totalUnits > 0 ? availableWidth / totalUnits : monthWidth;
+  const effectiveUnitWidth = Math.max(monthWidth, fitWidth);
 
   useEffect(() => {
-    setEffectiveMonthWidth(effectiveMonthWidth);
-  }, [effectiveMonthWidth, setEffectiveMonthWidth]);
+    if (timelineMode === 'weeks') {
+      setEffectiveWeekWidth(effectiveUnitWidth);
+    } else {
+      setEffectiveMonthWidth(effectiveUnitWidth);
+    }
+  }, [effectiveUnitWidth, timelineMode, setEffectiveMonthWidth, setEffectiveWeekWidth]);
 
-  const timelineWidth = totalMonths * effectiveMonthWidth;
+  const timelineWidth = totalUnits * effectiveUnitWidth;
 
   const dependencyMode = useStore((s) => s.dependencyMode);
   const showQuarters = useStore((s) => s.showQuarters);
@@ -92,10 +102,10 @@ export function GanttChart() {
     return { rows, totalHeight: y };
   }, [chartRows, rowHeight]);
   const dragRowSpan = useDragRowSpan(rowLayout.rows);
-  const dragConnect = useDragConnect(rowLayout.rows, effectiveMonthWidth);
+  const dragConnect = useDragConnect(rowLayout.rows, effectiveUnitWidth);
 
   const TIER_HEIGHT = 28;
-  const headerHeight = showQuarters ? TIER_HEIGHT * 3 : TIER_HEIGHT * 2;
+  const headerHeight = timelineMode === 'months' && showQuarters ? TIER_HEIGHT * 3 : TIER_HEIGHT * 2;
   const bodyHeight = Math.max(rowLayout.totalHeight, 300);
   const hasRows = chartRows.length > 0;
 
@@ -125,9 +135,10 @@ export function GanttChart() {
             endYear={endYear}
             chartStartMonth={startMonth}
             chartEndMonth={endMonth}
-            monthWidth={effectiveMonthWidth}
+            unitWidth={effectiveUnitWidth}
             totalWidth={timelineWidth}
             showQuarters={showQuarters}
+            timelineMode={timelineMode}
           />
         </div>
 
@@ -158,16 +169,26 @@ export function GanttChart() {
         {/* Timeline body */}
         <div className="relative" data-timeline-body style={{ height: bodyHeight }}>
           <TimelineGrid
-            totalMonths={totalMonths}
-            monthWidth={effectiveMonthWidth}
+            totalUnits={totalUnits}
+            unitWidth={effectiveUnitWidth}
             rows={rowLayout.rows}
             totalHeight={bodyHeight}
             chartStartMonth={startMonth}
+            startYear={startYear}
+            endYear={endYear}
+            endMonth={endMonth}
+            timelineMode={timelineMode}
           />
-          <TodayMarker startYear={startYear} chartStartMonth={startMonth} monthWidth={effectiveMonthWidth} totalHeight={rowLayout.totalHeight} />
+          <TodayMarker
+            startYear={startYear}
+            chartStartMonth={startMonth}
+            unitWidth={effectiveUnitWidth}
+            totalHeight={rowLayout.totalHeight}
+            timelineMode={timelineMode}
+          />
           <TimelineBody
             rows={rowLayout.rows}
-            monthWidth={effectiveMonthWidth}
+            monthWidth={effectiveUnitWidth}
             sidebarWidth={sidebarWidth}
             dragCreate={dragCreate}
             dragMove={dragMove}
@@ -178,7 +199,7 @@ export function GanttChart() {
           {dependencyMode && (
             <DependencyLayer
               rows={rowLayout.rows}
-              monthWidth={effectiveMonthWidth}
+              monthWidth={effectiveUnitWidth}
               timelineWidth={timelineWidth}
               bodyHeight={bodyHeight}
               dragConnect={dragConnect.dragState}

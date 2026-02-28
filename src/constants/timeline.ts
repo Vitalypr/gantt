@@ -3,6 +3,10 @@ export const MAX_MONTH_WIDTH = 180;
 export const ZOOM_STEP = 10;
 export const DEFAULT_MONTH_WIDTH = 80;
 
+export const DEFAULT_WEEK_WIDTH = 40;
+export const MIN_WEEK_WIDTH = 4;
+export const MAX_WEEK_WIDTH = 180;
+
 export const ROW_HEIGHT = 40;
 export const ROW_HEIGHT_SMALL = 28;
 export const ROW_HEIGHT_LARGE = 56;

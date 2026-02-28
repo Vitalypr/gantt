@@ -62,3 +62,120 @@ export function getCurrentMonthIndex(startYear: number, chartStartMonth = 1): nu
   const now = new Date();
   return (now.getFullYear() - startYear) * 12 + now.getMonth() - (chartStartMonth - 1);
 }
+
+// --- Weeks mode utilities ---
+
+/** Get the Monday-based start of the chart's first week (first day of startMonth) */
+function getChartWeekStart(startYear: number, startMonth: number): Date {
+  return new Date(startYear, startMonth - 1, 1);
+}
+
+/** Get the end of the chart's last week (last day of endMonth) */
+function getChartWeekEnd(endYear: number, endMonth: number): Date {
+  return new Date(endYear, endMonth, 0); // last day of endMonth
+}
+
+/** Total number of weeks in the date range (rounded up from days) */
+export function getTotalWeeks(startYear: number, endYear: number, startMonth = 1, endMonth = 12): number {
+  const start = getChartWeekStart(startYear, startMonth);
+  const end = getChartWeekEnd(endYear, endMonth);
+  const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+  return Math.ceil(diffDays / 7);
+}
+
+export type WeekMonthHeader = { label: string; startWeek: number; spanWeeks: number };
+export type WeekHeader = { label: string; weekIndex: number };
+
+/**
+ * Build month headers for weeks mode (top tier).
+ * Each month spans a certain number of weeks.
+ */
+export function buildMonthHeadersForWeeks(startYear: number, endYear: number, startMonth = 1, endMonth = 12): WeekMonthHeader[] {
+  const headers: WeekMonthHeader[] = [];
+  const chartStart = getChartWeekStart(startYear, startMonth);
+  let weekIdx = 0;
+
+  for (let year = startYear; year <= endYear; year++) {
+    const firstM = year === startYear ? startMonth : 1;
+    const lastM = year === endYear ? endMonth : 12;
+    for (let m = firstM; m <= lastM; m++) {
+      const monthStart = new Date(year, m - 1, 1);
+      const monthEnd = new Date(year, m, 0); // last day of month
+      // Calculate week indices for this month
+      const startDays = (monthStart.getTime() - chartStart.getTime()) / (1000 * 60 * 60 * 24);
+      const endDays = (monthEnd.getTime() - chartStart.getTime()) / (1000 * 60 * 60 * 24);
+      const wStart = Math.floor(startDays / 7);
+      const wEnd = Math.floor(endDays / 7);
+      const span = wEnd - wStart + 1;
+      headers.push({
+        label: `${MONTH_NAMES_SHORT[m - 1]} ${year}`,
+        startWeek: weekIdx,
+        spanWeeks: span,
+      });
+      weekIdx += span;
+    }
+  }
+  return headers;
+}
+
+/**
+ * Build individual week headers (bottom tier).
+ * Labels: W1, W2, W3... (sequential from chart start).
+ */
+export function buildWeekHeaders(startYear: number, endYear: number, startMonth = 1, endMonth = 12): WeekHeader[] {
+  const total = getTotalWeeks(startYear, endYear, startMonth, endMonth);
+  const headers: WeekHeader[] = [];
+  for (let i = 0; i < total; i++) {
+    headers.push({ label: `W${i + 1}`, weekIndex: i });
+  }
+  return headers;
+}
+
+/**
+ * Get the current week index relative to chart start.
+ * Returns a fractional value where the integer part is the week index
+ * and the fractional part is the day-of-week proportion.
+ */
+export function getCurrentWeekIndex(startYear: number, startMonth = 1): number {
+  const now = new Date();
+  const chartStart = getChartWeekStart(startYear, startMonth);
+  const diffDays = (now.getTime() - chartStart.getTime()) / (1000 * 60 * 60 * 24);
+  return diffDays / 7;
+}
+
+/**
+ * Get the week indices that are at month boundaries (for thicker grid lines).
+ * Returns a Set of week indices where a new month starts.
+ */
+export function getMonthBoundaryWeeks(startYear: number, endYear: number, startMonth = 1, endMonth = 12): Set<number> {
+  const boundaries = new Set<number>();
+  const chartStart = getChartWeekStart(startYear, startMonth);
+
+  for (let year = startYear; year <= endYear; year++) {
+    const firstM = year === startYear ? startMonth : 1;
+    const lastM = year === endYear ? endMonth : 12;
+    for (let m = firstM; m <= lastM; m++) {
+      const monthStart = new Date(year, m - 1, 1);
+      const daysSinceStart = (monthStart.getTime() - chartStart.getTime()) / (1000 * 60 * 60 * 24);
+      const weekIdx = Math.floor(daysSinceStart / 7);
+      if (weekIdx > 0) boundaries.add(weekIdx);
+    }
+  }
+  return boundaries;
+}
+
+/**
+ * Get the week indices that are at year boundaries (for even thicker grid lines).
+ */
+export function getYearBoundaryWeeks(startYear: number, endYear: number, startMonth = 1): Set<number> {
+  const boundaries = new Set<number>();
+  const chartStart = getChartWeekStart(startYear, startMonth);
+
+  for (let year = startYear + 1; year <= endYear; year++) {
+    const yearStart = new Date(year, 0, 1);
+    const daysSinceStart = (yearStart.getTime() - chartStart.getTime()) / (1000 * 60 * 60 * 24);
+    const weekIdx = Math.floor(daysSinceStart / 7);
+    if (weekIdx > 0) boundaries.add(weekIdx);
+  }
+  return boundaries;
+}
