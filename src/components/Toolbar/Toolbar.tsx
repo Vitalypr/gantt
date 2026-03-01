@@ -5,6 +5,7 @@ import {
   Undo2,
   Redo2,
   Save,
+  Camera,
   Download,
   Upload,
   Plus,
@@ -29,6 +30,7 @@ import { SaveDialog } from '@/components/Dialogs/SaveDialog';
 import { AddRowDialog } from '@/components/Dialogs/AddRowDialog';
 import { HelpDialog } from '@/components/Dialogs/HelpDialog';
 import { useTheme } from '@/hooks/useTheme';
+import { snapshotGantt } from '@/utils/snapshot';
 
 function ToolbarSeparator() {
   return <div className="mx-1.5 h-5 w-px bg-border" />;
@@ -465,6 +467,15 @@ export function Toolbar() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>Import JSON</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => snapshotGantt(chartName)}>
+                <Camera className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Snapshot (JPEG)</TooltipContent>
           </Tooltip>
         </ToolbarGroup>
 

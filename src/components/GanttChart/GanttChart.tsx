@@ -117,6 +117,7 @@ export function GanttChart() {
     >
       <div
         className="grid"
+        data-gantt-grid
         style={{
           gridTemplateColumns: `${sidebarWidth}px ${timelineWidth}px`,
           gridTemplateRows: `${headerHeight}px ${bodyHeight}px`,
