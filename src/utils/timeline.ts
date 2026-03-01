@@ -118,15 +118,27 @@ export function buildMonthHeadersForWeeks(startYear: number, endYear: number, st
   return headers;
 }
 
+/** Get the ISO week number for a given date (1-based, Mon=start) */
+function getISOWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24) + 1) / 7);
+}
+
 /**
  * Build individual week headers (bottom tier).
- * Labels: W1, W2, W3... (sequential from chart start).
+ * Labels use calendar week numbers (W1–W52/53) based on the calendar year,
+ * not sequential from chart start.
  */
 export function buildWeekHeaders(startYear: number, endYear: number, startMonth = 1, endMonth = 12): WeekHeader[] {
   const total = getTotalWeeks(startYear, endYear, startMonth, endMonth);
+  const chartStart = getChartWeekStart(startYear, startMonth);
   const headers: WeekHeader[] = [];
   for (let i = 0; i < total; i++) {
-    headers.push({ label: `W${i + 1}`, weekIndex: i });
+    const weekDate = new Date(chartStart.getTime() + i * 7 * 24 * 60 * 60 * 1000);
+    const weekNum = getISOWeekNumber(weekDate);
+    headers.push({ label: `W${weekNum}`, weekIndex: i });
   }
   return headers;
 }
