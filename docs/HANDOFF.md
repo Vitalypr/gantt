@@ -1,6 +1,6 @@
 # Handoff
 
-_Updated 2026-09-12 · branch `feat/rtl-hebrew-holidays-and-roadmap` · committed at `ed9dfc1`, not pushed_
+_Updated 2026-09-12 · branch `feat/rtl-hebrew-holidays-and-roadmap` · pushed at `e59c070`_
 
 ## State
 
@@ -43,9 +43,8 @@ kept recurring.
 
 ## Open threads
 
-- **`ed9dfc1` is unpushed.** The work is committed now, but it exists on one disk only;
-  `origin/main` is still at `c4e4054` and the branch has no remote counterpart. Pushing it is
-  the only thing between this state and another total loss.
+- **The branch is not merged.** `feat/rtl-hebrew-holidays-and-roadmap` is pushed and tracking
+  `origin/`, but `origin/main` is still at `c4e4054`. Opening the PR is the remaining step.
 - **`e2e/features.spec.ts` and `gestures.spec.ts` are parked** (`describe.skip`) with a banner
   saying why: they need a `window.__ganttStore` test hook that was lost. Much of what they
   describe now exists, so they are worth reviving behind that hook.
