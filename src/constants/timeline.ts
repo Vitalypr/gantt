@@ -16,6 +16,14 @@ export const ROW_SIZE_MAP = {
   large: ROW_HEIGHT_LARGE,
 } as const;
 
+/**
+ * Empty rows a brand-new chart starts with.
+ *
+ * A plan is drawn by filling rows that are already there, so the blank chart offers a sheet
+ * rather than a single line and an empty-state prompt.
+ */
+export const DEFAULT_ROW_COUNT = 12;
+
 export const DEFAULT_SIDEBAR_WIDTH = 240;
 export const MIN_SIDEBAR_WIDTH = 60;
 export const MAX_SIDEBAR_WIDTH = 400;
@@ -49,6 +57,21 @@ export const ROW_SPAN_EDGE_THRESHOLD = 6;
 export const MILESTONE_OUTLINE_WIDTH = 3;
 /** Ordinary bars carry the same frame, thinner. */
 export const BAR_OUTLINE_WIDTH = 1.5;
+
+/**
+ * Status rail geometry, in px.
+ *
+ * Deliberately small and pinned to the bottom edge. The rail is absolutely positioned so it
+ * takes no part in layout; the only vertical cost to the label is `STATUS_RAIL_RESERVE`,
+ * which the bar adds as bottom padding so a label that wraps to two lines stops ABOVE the
+ * rail instead of running under it.
+ */
+export const STATUS_RAIL_HEIGHT = 3;
+export const STATUS_RAIL_BOTTOM = 3;
+/** Horizontal inset, enough to clear the bar's corner radius. */
+export const STATUS_RAIL_INSET = 5;
+/** Vertical space the label gives up while a rail is shown — nothing when it is not. */
+export const STATUS_RAIL_RESERVE = STATUS_RAIL_HEIGHT + STATUS_RAIL_BOTTOM;
 
 /** Label sizes a bar can step through, smallest to largest. */
 export const FONT_SIZE_STEPS = [8, 9, 10, 11, 12, 14, 16, 18] as const;

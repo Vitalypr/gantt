@@ -4,15 +4,15 @@ import {
   Palette,
   Pencil,
   RectangleHorizontal,
-  Square,
   Trash2,
   Type,
-  Percent,
+  CircleDot,
 } from 'lucide-react';
-import type { Activity } from '@/types/gantt';
+import type { Activity, ActivityStatus } from '@/types/gantt';
 import { FONT_SIZE_STEPS, stepFontSize } from '@/constants/timeline';
-import { defaultFontSize, effectiveFontSize } from '@/utils/activity';
+import { defaultFontSize, effectiveFontSize, statusFillFraction } from '@/utils/activity';
 import { useStore } from '@/stores';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Check } from 'lucide-react';
 import { ColorPicker } from './ColorPicker';
@@ -40,8 +40,18 @@ type ActivityContextMenuProps = {
  * They render very differently but behave identically, and when the two menus were written
  * separately an action added to one silently did not exist on the other.
  */
-/** Coarse steps: this is a drawing tool, not a tracker; a slider would imply precision. */
-const PROGRESS_STEPS = [0, 25, 50, 75, 100] as const;
+/**
+ * Discrete states, not a percentage: this is a drawing tool, not a tracker, and a slider
+ * would imply a precision it does not model. `undefined` is a real choice, not a gap — it
+ * means the activity is not tracked, and its bar draws exactly as it did before statuses
+ * existed.
+ */
+const STATUS_CHOICES: { value: ActivityStatus | undefined; label: string }[] = [
+  { value: undefined, label: 'Not relevant' },
+  { value: 'todo', label: 'Not started' },
+  { value: 'doing', label: 'In progress' },
+  { value: 'done', label: 'Done' },
+];
 
 export function ActivityContextMenu({
   activity,
@@ -52,6 +62,8 @@ export function ActivityContextMenu({
   const updateActivity = useStore((s) => s.updateActivity);
   const removeActivity = useStore((s) => s.removeActivity);
   const selectActivity = useStore((s) => s.selectActivity);
+
+  const [colorTarget, setColorTarget] = useState(0);
 
   const size = effectiveFontSize(activity);
   const atSmallest = size <= FONT_SIZE_STEPS[0]!;
@@ -71,30 +83,31 @@ export function ActivityContextMenu({
           {activity.annotation ? 'Edit Annotation' : 'Add Annotation'}
         </ContextMenuItem>
 
+        {/* ONE palette. Fill and frame were two submenus rendering the same grid, so the
+            whole palette had to be scanned twice to answer "which one am I looking at". */}
         <ContextMenuSub>
           <ContextMenuSubTrigger>
             <Palette className="mr-2 h-3.5 w-3.5" />
-            Fill Colour
+            Colour
           </ContextMenuSubTrigger>
           <ContextMenuSubContent className="p-2">
             <ColorPicker
-              currentColor={activity.color}
-              onColorChange={(color) => updateActivity(activity.id, { color })}
-            />
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>
-            <Square className="mr-2 h-3.5 w-3.5" />
-            Frame Colour
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent className="p-2">
-            <ColorPicker
-              currentColor={activity.outlineColor}
-              onColorChange={(outlineColor) => updateActivity(activity.id, { outlineColor })}
-              onReset={() => updateActivity(activity.id, { outlineColor: undefined })}
-              resetLabel="Default (grey)"
+              activeIndex={colorTarget}
+              onActiveIndexChange={setColorTarget}
+              targets={[
+                {
+                  label: 'Fill',
+                  current: activity.color,
+                  onPick: (color) => updateActivity(activity.id, { color }),
+                },
+                {
+                  label: 'Frame',
+                  current: activity.outlineColor,
+                  onPick: (outlineColor) => updateActivity(activity.id, { outlineColor }),
+                  onReset: () => updateActivity(activity.id, { outlineColor: undefined }),
+                  resetLabel: 'Default (grey)',
+                },
+              ]}
             />
           </ContextMenuSubContent>
         </ContextMenuSub>
@@ -133,27 +146,24 @@ export function ActivityContextMenu({
           </ContextMenuSubContent>
         </ContextMenuSub>
 
-        {!activity.isMilestone && (
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>
-              <Percent className="mr-2 h-3.5 w-3.5" />
-              Progress
-            </ContextMenuSubTrigger>
-            <ContextMenuSubContent>
-              {PROGRESS_STEPS.map((pct) => (
-                <ContextMenuItem
-                  key={pct}
-                  onClick={() =>
-                    updateActivity(activity.id, { progress: pct === 0 ? undefined : pct })
-                  }
-                >
-                  <span className="mr-2 w-8 tabular-nums text-right">{pct}%</span>
-                  {(activity.progress ?? 0) === pct && <Check className="h-3.5 w-3.5" />}
-                </ContextMenuItem>
-              ))}
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-        )}
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <CircleDot className="mr-2 h-3.5 w-3.5" />
+            Status
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            {STATUS_CHOICES.map((choice) => (
+              <ContextMenuItem
+                key={choice.label}
+                onClick={() => updateActivity(activity.id, { status: choice.value })}
+              >
+                <StatusSwatch status={choice.value} />
+                <span className="flex-1">{choice.label}</span>
+                {activity.status === choice.value && <Check className="ml-2 h-3.5 w-3.5" />}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
 
         <ContextMenuSeparator />
 
@@ -189,5 +199,20 @@ export function ActivityContextMenu({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
+  );
+}
+
+/** The rail, at menu scale, so the list shows the mark rather than describing it. */
+function StatusSwatch({ status }: { status: ActivityStatus | undefined }) {
+  if (status === undefined) {
+    return <span className="mr-2 h-1 w-6 shrink-0 rounded-full border border-dashed border-current opacity-30" />;
+  }
+  return (
+    <span className="mr-2 h-1 w-6 shrink-0 overflow-hidden rounded-full bg-current/25">
+      <span
+        className="block h-full rounded-full bg-current"
+        style={{ width: `${statusFillFraction(status) * 100}%` }}
+      />
+    </span>
   );
 }

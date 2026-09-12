@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Pencil, Trash2, Plus, Merge, SplitSquareVertical, ArrowUp, ArrowDown, FolderTree, ChevronDown, ChevronRight } from 'lucide-react';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { useStore } from '@/stores';
+import { useChartDirection } from '@/hooks/useChartDirection';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { cn } from '@/lib/utils';
 import {
@@ -28,6 +29,7 @@ type SidebarProps = {
 };
 
 export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProps) {
+  const { isRtl } = useChartDirection();
   const rowSize = useStore((s) => s.rowSize);
   const rowHeight = ROW_SIZE_MAP[rowSize];
   const chartRows = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.rows : s.chart.rows);
@@ -48,7 +50,7 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProp
   const mergeGroups = buildMergeGroups(rows);
 
   return (
-    <div className="relative" style={{ width: sidebarWidth, height: totalHeight }}>
+    <div className="relative h-full" style={{ width: sidebarWidth, minHeight: totalHeight }}>
       {rows.map((row, index) => {
         const rowData = chartRows.find((r) => r.id === row.rowId);
         const mergeGroup = mergeGroups.get(row.rowId);
@@ -171,10 +173,12 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProp
         );
       })}
 
-      {/* Resize handle — wide touch target with thin visible line */}
+      {/* Resize handle — wide touch target with thin visible line.
+          Sits on the edge the sidebar SHARES with the timeline, which is physically left in
+          RTL. `right` there put it against the window edge, half of it off-screen. */}
       <div
         className="absolute top-0 z-20 h-full w-5 cursor-col-resize group"
-        style={{ touchAction: 'none', right: -10 }}
+        style={isRtl ? { touchAction: 'none', left: -10 } : { touchAction: 'none', right: -10 }}
         onPointerDown={onResizePointerDown}
       >
         <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-border group-hover:bg-ring/50 group-active:bg-ring transition-colors" />

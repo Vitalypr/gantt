@@ -1,10 +1,10 @@
 # Handoff
 
-_Updated 2026-09-12 · branch `main` · pushed at `b112e55`_
+_Updated 2026-09-12 · branch `main` · pushed at `322b1a3`, working tree has uncommitted UI work_
 
 ## State
 
-All gates green: `tsc -b` 0 · `pnpm lint` **0 errors** (20 warnings) · `pnpm test` **163
+All gates green: `tsc -b` 0 · `pnpm lint` **0 errors** (20 warnings) · `pnpm test` **201
 passing** · `pnpm test:e2e` **47 passing** (30 parked) · `pnpm build` and `pnpm build:single`
 both succeed. `tsc`, `lint`, `test`, `build` and `build:single` re-run on the dev box at
 `b112e55`, the merged tip; the E2E figure is from `ed9dfc1`, verified on a clean Linux
@@ -28,6 +28,18 @@ kept recurring.
   identical types, so a misroute compiled fine; now it is a type error. Narrow on `chart.unit`.
 - **One gesture, one commit.** `moveActivity`, `setActivityRowSpan`, `transformActivities`,
   `updateActivities`, `removeActivities` are compound so a gesture never costs two Ctrl+Z.
+- **`Activity.status` is drawn as a rail, and the rail's height is a contract.** The rail is
+  absolutely positioned inside the bar's bottom edge, so the only height it costs the label is
+  `STATUS_RAIL_RESERVE`, added as the bar's `paddingBottom` and only while a rail is drawn. The
+  label box is `self-stretch overflow-hidden`, so it IS that padded box and clips there — which
+  is what makes "text never reaches the rail" structural rather than a sum that happens to work
+  at the default font size. `src/test/activity-status.test.ts` asserts both, including the case
+  that fails without the reserve.
+- **`utils/layout.ts` owns the width arithmetic the sidebar drag and fit-to-view share.**
+  `fitUnitWidth` divides the space beside the sidebar by the unit count; `sidebarWidthFromDrag`
+  turns a pointer delta into a width. Both are RTL-aware by construction and unit-tested —
+  the drag used to take `clientX` as the width outright, which is only true when the sidebar
+  starts at viewport x=0 and so clamped every RTL drag to the maximum on the first move.
 - **`utils/viewSettings.ts` is the single parser** for persisted view settings, with a
   compile-time key list. Three hand-kept copies is how fields were silently dropped on reload.
 - **`hooks/useLatest.ts`** replaced every ref-written-during-render.
@@ -48,7 +60,8 @@ kept recurring.
 - **`e2e/features.spec.ts` and `gestures.spec.ts` are parked** (`describe.skip`) with a banner
   saying why: they need a `window.__ganttStore` test hook that was lost. Much of what they
   describe now exists, so they are worth reviving behind that hook.
-- Five drag hooks still lack `pointercancel` handling; `useDragMove` is the one to copy from.
+- Four drag hooks still lack `pointercancel` handling; `useDragMove` is the one to copy from,
+  and `useResizeSidebar` now handles it too.
 - 20 lint warnings remain, all `react-hooks` memoisation notes on the drag hooks. They are
   warnings by choice: this project does not run the React Compiler.
 

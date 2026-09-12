@@ -51,6 +51,29 @@ export function pickLabelColor(background: string): string {
     : LABEL_DARK;
 }
 
+/** `hex` at `alpha`, as an `rgba()` string. */
+export function withAlpha(hex: string, alpha: number): string {
+  const rgb = parseHex(hex);
+  if (!rgb) return hex;
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+}
+
+/** Track and fill alphas for the status rail. */
+const RAIL_TRACK_ALPHA = 0.28;
+const RAIL_FILL_ALPHA = 0.95;
+
+/**
+ * The two inks a status rail draws with, on a bar of `background`.
+ *
+ * Derived from the same measured choice as the label, so the rail stays legible on a 100
+ * tint and a 900 alike instead of being a hardcoded black or white that disappears on one
+ * half of the palette.
+ */
+export function railInk(background: string): { track: string; fill: string } {
+  const ink = pickLabelColor(background);
+  return { track: withAlpha(ink, RAIL_TRACK_ALPHA), fill: withAlpha(ink, RAIL_FILL_ALPHA) };
+}
+
 /** True when a white label wins on this background. */
 export function isColorDark(hex: string): boolean {
   return pickLabelColor(hex) === LABEL_LIGHT;

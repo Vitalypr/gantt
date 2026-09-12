@@ -26,6 +26,7 @@ import {
   ArrowLeftRight,
   AArrowDown,
   AArrowUp,
+  CircleDot,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +44,7 @@ import { MIN_MONTH_WIDTH, MAX_MONTH_WIDTH, MIN_WEEK_WIDTH, MAX_WEEK_WIDTH, FONT_
 import { effectiveFontSize } from '@/utils/activity';
 import { MONTH_NAMES_SHORT } from '@/constants/timeline';
 import { getTotalMonths, getTotalWeeks } from '@/utils/timeline';
+import { fitUnitWidth } from '@/utils/layout';
 import { SaveDialog } from '@/components/Dialogs/SaveDialog';
 import { AddRowDialog } from '@/components/Dialogs/AddRowDialog';
 import { HelpDialog } from '@/components/Dialogs/HelpDialog';
@@ -117,6 +119,8 @@ export function Toolbar() {
   const [markersDialogOpen, setMarkersDialogOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const showLegend = useStore((s) => s.showLegend);
+  const showStatus = useStore((s) => s.showStatus);
+  const setShowStatus = useStore((s) => s.setShowStatus);
   const setShowLegend = useStore((s) => s.setShowLegend);
   const [toast, setToast] = useState<ToastMessage>(null);
   const [snapshotting, setSnapshotting] = useState(false);
@@ -162,10 +166,15 @@ export function Toolbar() {
       : getTotalMonths(startYear, endYear, startMonth, endMonth);
     if (totalUnits <= 0) return;
 
-    const sw = useStore.getState().sidebarWidth;
-    const availableWidth = scrollContainer.clientWidth - sw;
-    const ideal = Math.floor(availableWidth / totalUnits);
-    const clamped = Math.max(minWidth, Math.min(maxWidth, ideal));
+    // Same arithmetic as the sidebar drag, so the button and the drag agree to the pixel.
+    const clamped = fitUnitWidth({
+      containerWidth: scrollContainer.clientWidth,
+      sidebarWidth: useStore.getState().sidebarWidth,
+      totalUnits,
+      min: minWidth,
+      max: maxWidth,
+    });
+    if (clamped === null) return;
 
     if (timelineMode === 'weeks') {
       setWeekWidth(clamped);
@@ -480,6 +489,24 @@ export function Toolbar() {
             <TooltipContent>{showQuarters ? 'Hide Quarters' : 'Show Quarters'}</TooltipContent>
           </Tooltip>
         )}
+
+        {/* Status rails — one switch for the whole chart, so a plan can be reviewed with
+            delivery state on and then exported without it. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={showStatus ? 'default' : 'ghost'}
+              size="icon"
+              aria-label={showStatus ? 'Hide status on all bars' : 'Show status on all bars'}
+              aria-pressed={showStatus}
+              className="h-7 w-7"
+              onClick={() => setShowStatus(!showStatus)}
+            >
+              <CircleDot className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{showStatus ? 'Hide Status (all bars)' : 'Show Status (all bars)'}</TooltipContent>
+        </Tooltip>
 
         {/* Row height cycle */}
         <Tooltip>

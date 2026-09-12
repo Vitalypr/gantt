@@ -9,6 +9,7 @@ export const DEFAULT_VIEW_SETTINGS: ViewSettings = {
   timelineMode: undefined,
   chartDirection: undefined,
   showLegend: undefined,
+  showStatus: undefined,
 };
 
 /**
@@ -24,6 +25,7 @@ export const VIEW_SETTING_KEYS = [
   'timelineMode',
   'chartDirection',
   'showLegend',
+  'showStatus',
 ] as const satisfies readonly (keyof ViewSettings)[];
 
 // If a field is added to ViewSettings and NOT to the list above, this line stops compiling.
@@ -64,5 +66,6 @@ export function parseViewSettings(raw: unknown): ViewSettings | undefined {
     timelineMode: v['timelineMode'] === 'weeks' ? 'weeks' : v['timelineMode'] === 'months' ? 'months' : undefined,
     chartDirection: v['chartDirection'] === 'rtl' ? 'rtl' : v['chartDirection'] === 'ltr' ? 'ltr' : undefined,
     showLegend: bool('showLegend', undefined),
+    showStatus: bool('showStatus', undefined),
   };
 }

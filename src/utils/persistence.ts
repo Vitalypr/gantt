@@ -1,4 +1,5 @@
 import type { Chart, MonthsChart, SavedChartEntry, TimelineMode, WeeksChart } from '@/types/gantt';
+import { statusFromLegacyProgress } from '@/utils/activity';
 import { unitForMode } from '@/types/gantt';
 import { parseViewSettings } from '@/utils/viewSettings';
 
@@ -402,8 +403,14 @@ export function normalizeChart<T extends Chart>(chart: T): T {
   const normalisedActivities = activities.map((a) => {
     const idx = rowIndexOf.get(a.id) ?? 0;
     const maxSpan = Math.max(1, rows.length - idx);
+    // `progress` (0-100) became a discrete `status`. Charts saved before the change carry the
+    // number, and this is the one ingress every chart passes through, so the mapping lives
+    // here rather than in `migrateChart` — which returns early for already-flat charts.
+    const { progress, ...rest } = a as typeof a & { progress?: unknown };
+    const status = a.status ?? statusFromLegacyProgress(progress) ?? undefined;
     return {
-      ...a,
+      ...rest,
+      status,
       startMonth: Math.max(0, Math.round(a.startMonth ?? 0)),
       durationMonths: Math.max(1, Math.round(a.durationMonths ?? 1)),
       rowSpan: a.rowSpan === undefined ? undefined : Math.min(Math.max(1, Math.round(a.rowSpan)), maxSpan),

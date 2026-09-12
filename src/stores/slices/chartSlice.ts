@@ -2,6 +2,7 @@ import type { StateCreator } from 'zustand';
 import { nanoid } from 'nanoid';
 import type { Activity, Chart, ChartMarker, Dependency, GanttRow, MonthsChart, WeeksChart, TimelineMode } from '@/types/gantt';
 import { loadAutoSave, loadWeeksAutoSave } from '@/utils/persistence';
+import { DEFAULT_ROW_COUNT } from '@/constants/timeline';
 
 type ActiveChart = Chart;
 
@@ -78,6 +79,16 @@ type ModeDeps = {
   timelineMode: TimelineMode;
 };
 
+/** The blank rows a new chart opens with. Both modes start the same way. */
+function createEmptyRows(count: number): GanttRow[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: nanoid(),
+    name: '',
+    order: i,
+    activityIds: [],
+  }));
+}
+
 function createDefaultChart(): MonthsChart {
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -89,7 +100,7 @@ function createDefaultChart(): MonthsChart {
     startMonth: 1,
     endYear: currentYear + 2,
     endMonth: 12,
-    rows: [{ id: nanoid(), name: '', order: 0, activityIds: [] }],
+    rows: createEmptyRows(DEFAULT_ROW_COUNT),
     activities: [],
     dependencies: [],
     createdAt: now.toISOString(),
@@ -108,7 +119,7 @@ function createDefaultWeeksChart(): WeeksChart {
     startMonth: 1,
     endYear: currentYear + 2,
     endMonth: 12,
-    rows: [{ id: nanoid(), name: '', order: 0, activityIds: [] }],
+    rows: createEmptyRows(DEFAULT_ROW_COUNT),
     activities: [],
     dependencies: [],
     createdAt: now.toISOString(),
@@ -131,7 +142,9 @@ function applyActivityUpdates(activity: Activity, updates: Partial<Activity>): v
   if (updates.order !== undefined) activity.order = updates.order;
   if (updates.isMilestone !== undefined) activity.isMilestone = updates.isMilestone;
   if (updates.rowSpan !== undefined) activity.rowSpan = updates.rowSpan;
-  if (updates.progress !== undefined) activity.progress = updates.progress;
+  // `in`, not `!== undefined`: undefined is the meaningful "not tracked" value, and the
+  // `!== undefined` guard this replaced made the reset silently do nothing.
+  if ('status' in updates) activity.status = updates.status;
   if ('annotation' in updates) activity.annotation = updates.annotation;
   if ('outlineColor' in updates) activity.outlineColor = updates.outlineColor;
   if ('fontSize' in updates) activity.fontSize = updates.fontSize;

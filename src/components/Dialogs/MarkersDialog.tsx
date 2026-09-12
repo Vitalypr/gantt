@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { useStore } from '@/stores';
 import { activeChart } from '@/stores/selectors';
-import { ACTIVITY_COLOR_GROUPS } from '@/constants/colors';
+import { BASE_TONE_COLORS } from '@/constants/colors';
 
 type MarkersDialogProps = {
   open: boolean;
@@ -25,7 +25,9 @@ function todayISO(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-const MARKER_COLORS = ACTIVITY_COLOR_GROUPS.flatMap((g) => [g.colors[2]]);
+/** One swatch per hue, at the base tone. Was a hand-written `colors[2]`, which silently
+ *  meant a different tone the moment the palette gained a column. */
+const MARKER_COLORS = BASE_TONE_COLORS;
 
 export function MarkersDialog({ open, onOpenChange }: MarkersDialogProps) {
   const markers = useStore((s) => activeChart(s).markers) ?? [];

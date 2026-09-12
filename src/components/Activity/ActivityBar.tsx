@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import type { Activity, AnchorSide } from '@/types/gantt';
 import { ANCHOR_SIDES } from '@/types/gantt';
-import { BAR_OUTLINE_WIDTH, EDGE_THRESHOLD, ROW_SPAN_EDGE_THRESHOLD } from '@/constants/timeline';
+import {
+  BAR_OUTLINE_WIDTH,
+  EDGE_THRESHOLD,
+  ROW_SPAN_EDGE_THRESHOLD,
+  STATUS_RAIL_RESERVE,
+} from '@/constants/timeline';
 import { useStore } from '@/stores';
 import { unitSpanToLeft } from '@/utils/timeline';
 import { useChartDirection } from '@/hooks/useChartDirection';
@@ -11,6 +16,7 @@ import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { AnnotationPopover } from './AnnotationPopover';
 import { ActivityNameInput } from './ActivityNameInput';
 import { ActivityContextMenu } from './ActivityContextMenu';
+import { StatusRail } from './StatusRail';
 import { effectiveFontSize } from '@/utils/activity';
 
 type ActivityBarProps = {
@@ -56,6 +62,7 @@ export function ActivityBar({
 }: ActivityBarProps) {
   const setEditingActivity = useStore((s) => s.setEditingActivity);
   const timelineMode = useStore((s) => s.timelineMode);
+  const showStatus = useStore((s) => s.showStatus);
 
   const checkDoubleTap = useDoubleTap();
 
@@ -75,6 +82,10 @@ export function ActivityBar({
   const fontSize = effectiveFontSize(activity);
   // Undefined means "follow the theme": a frozen literal would not re-theme in dark mode.
   const frameColor = activity.outlineColor ?? 'var(--color-bar-outline)';
+  // The rail is absolutely positioned, so the ONLY height it costs the label is this
+  // reserve — and only while a rail is actually drawn. An untracked bar is unchanged.
+  const rail = showStatus ? activity.status : undefined;
+
   const effectiveRowSpan = rowSpanOverride ?? rowSpan;
   const isSpanning = effectiveRowSpan > 1;
   const heightStyle = `calc(${effectiveRowSpan * 100}% - 8px)`;
@@ -104,6 +115,7 @@ export function ActivityBar({
             // nor the rect dependency arrows attach to.
             outline: `${BAR_OUTLINE_WIDTH}px solid ${frameColor}`,
             outlineOffset: -BAR_OUTLINE_WIDTH,
+            paddingBottom: rail ? STATUS_RAIL_RESERVE : undefined,
             // Rows are separate absolutely-positioned containers with overflow visible, so a
             // translate is what carries the bar across them; z-index lifts it over the rest.
             transform: dragOffsetY ? `translateY(${dragOffsetY}px)` : undefined,
@@ -166,7 +178,9 @@ export function ActivityBar({
           <div className="resize-handle resize-handle--left" />
 
           {/* Name label or edit input */}
-          <div className="flex-1 overflow-hidden px-2">
+          {/* self-stretch + clip: the label box IS the padded content box, so no font size
+              or line count can push text over the rail. */}
+          <div className="flex min-w-0 flex-1 items-center justify-center self-stretch overflow-hidden px-2">
             {isEditing ? (
               <ActivityNameInput
                 activityId={activity.id}
@@ -179,7 +193,7 @@ export function ActivityBar({
                 data-activity-label
                 dir="auto"
                 className={cn(
-                  'block text-center font-medium leading-tight',
+                  'block w-full text-center font-medium leading-tight',
                   effectiveRowSpan >= 3 ? '' : isSpanning ? 'line-clamp-4' : 'line-clamp-2',
                 )}
                 style={{ color: labelColor, fontSize, wordBreak: 'break-word' }}
@@ -189,11 +203,13 @@ export function ActivityBar({
             )}
           </div>
 
-          {/* Duration label - bottom right */}
+          {rail && <StatusRail status={rail} barColor={activity.color} isRtl={isRtl} />}
+
+          {/* Duration label - bottom right, lifted clear of the rail when one is drawn */}
           {!isEditing && duration > 1 && (
             <span
-              className="absolute bottom-0.5 right-1 text-[9px] font-medium leading-none opacity-60"
-              style={{ color: labelColor }}
+              className="absolute right-1 text-[9px] font-medium leading-none opacity-60"
+              style={{ color: labelColor, bottom: rail ? STATUS_RAIL_RESERVE + 1 : 2 }}
             >
               {duration}{timelineMode === 'weeks' ? 'w' : 'm'}
             </span>

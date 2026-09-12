@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Activity, AnchorSide } from '@/types/gantt';
 import { ANCHOR_SIDES } from '@/types/gantt';
-import { MILESTONE_OUTLINE_WIDTH } from '@/constants/timeline';
+import { MILESTONE_OUTLINE_WIDTH, STATUS_RAIL_RESERVE } from '@/constants/timeline';
 import { useStore } from '@/stores';
 import { unitSpanToLeft } from '@/utils/timeline';
 import { useChartDirection } from '@/hooks/useChartDirection';
@@ -11,6 +11,7 @@ import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { AnnotationPopover } from './AnnotationPopover';
 import { ActivityNameInput } from './ActivityNameInput';
 import { ActivityContextMenu } from './ActivityContextMenu';
+import { StatusRail } from './StatusRail';
 import { effectiveFontSize } from '@/utils/activity';
 
 type MilestoneMarkerProps = {
@@ -52,6 +53,7 @@ export function MilestoneMarker({
   onAnchorPointerDown,
 }: MilestoneMarkerProps) {
   const setEditingActivity = useStore((s) => s.setEditingActivity);
+  const showStatus = useStore((s) => s.showStatus);
 
   const checkDoubleTap = useDoubleTap();
 
@@ -65,6 +67,7 @@ export function MilestoneMarker({
   const labelColor = isDark ? '#ffffff' : '#0f172a';
   const fontSize = effectiveFontSize(activity);
   const frameColor = activity.outlineColor ?? 'var(--color-bar-outline)';
+  const rail = showStatus ? activity.status : undefined;
 
   return (
     <ActivityContextMenu
@@ -88,6 +91,7 @@ export function MilestoneMarker({
           backgroundColor: activity.color,
           outline: `${MILESTONE_OUTLINE_WIDTH}px solid ${frameColor}`,
           outlineOffset: -MILESTONE_OUTLINE_WIDTH,
+          paddingBottom: rail ? STATUS_RAIL_RESERVE : undefined,
           transform: dragOffsetY ? `translateY(${dragOffsetY}px)` : undefined,
           zIndex: dragOffsetY ? 30 : undefined,
         }}
@@ -118,7 +122,7 @@ export function MilestoneMarker({
           iconColorStyle={{ color: labelColor }}
         />
 
-        <div className="flex-1 overflow-hidden px-1">
+        <div className="flex min-w-0 flex-1 items-center justify-center self-stretch overflow-hidden px-1">
           {isEditing ? (
             <ActivityNameInput
                 activityId={activity.id}
@@ -131,13 +135,23 @@ export function MilestoneMarker({
               data-activity-label
               dir="auto"
               title={activity.name || undefined}
-              className="block text-center font-semibold leading-tight line-clamp-2"
+              className="block w-full text-center font-semibold leading-tight line-clamp-2"
               style={{ color: labelColor, fontSize, wordBreak: 'break-word' }}
             >
               {activity.name}
             </span>
           )}
         </div>
+
+        {/* Inset clears the milestone's heavier frame, which is thicker than a bar's. */}
+        {rail && (
+          <StatusRail
+            status={rail}
+            barColor={activity.color}
+            isRtl={isRtl}
+            inset={MILESTONE_OUTLINE_WIDTH + 1}
+          />
+        )}
 
         {onAnchorPointerDown && (
           <>

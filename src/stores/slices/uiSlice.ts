@@ -44,6 +44,8 @@ export type UiSlice = {
   /** Find-in-chart query; null means the panel is closed. */
   findQuery: string | null;
   showLegend: boolean;
+  /** Master switch for every status rail on the canvas. */
+  showStatus: boolean;
 
   zoomIn: () => void;
   zoomOut: () => void;
@@ -65,6 +67,7 @@ export type UiSlice = {
   toggleChartDirection: () => void;
   setFindQuery: (query: string | null) => void;
   setShowLegend: (show: boolean) => void;
+  setShowStatus: (show: boolean) => void;
 };
 
 export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []> = (set) => ({
@@ -83,6 +86,7 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   chartDirection: 'ltr' as ChartDirection,
   findQuery: null as string | null,
   showLegend: false,
+  showStatus: true,
 
   zoomIn: () =>
     set((state) => {
@@ -186,6 +190,11 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   setShowLegend: (show) =>
     set((state) => {
       state.showLegend = show;
+    }),
+
+  setShowStatus: (show) =>
+    set((state) => {
+      state.showStatus = show;
     }),
 
   setFindQuery: (query) =>

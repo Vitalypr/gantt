@@ -24,8 +24,9 @@ export type Activity = {
   outlineColor?: string;
   /** Label size in px. Undefined means the size-for-kind default. */
   fontSize?: number;
-  /** Completion, 0-100, drawn as a darker inner fill. Undefined means not tracked. */
-  progress?: number;
+  /** Delivery state, drawn as a rail inside the bar's bottom edge. Undefined means the
+   *  activity is not tracked — the bar renders exactly as it did before the field existed. */
+  status?: ActivityStatus;
 };
 
 export type GanttRow = {
@@ -61,6 +62,15 @@ export type TimelineMode = 'months' | 'weeks';
 export const CHART_DIRECTIONS = ['ltr', 'rtl'] as const;
 export type ChartDirection = (typeof CHART_DIRECTIONS)[number];
 
+/**
+ * Three states plus the absence of one.
+ *
+ * Discrete on purpose: this is a drawing tool, and a percentage would imply a precision it
+ * does not model. Replaced a numeric `progress` that the menu wrote and nothing ever read.
+ */
+export const ACTIVITY_STATUSES = ['todo', 'doing', 'done'] as const;
+export type ActivityStatus = (typeof ACTIVITY_STATUSES)[number];
+
 export type ViewSettings = {
   sidebarWidth: number;
   monthWidth: number;
@@ -70,6 +80,8 @@ export type ViewSettings = {
   timelineMode?: TimelineMode;
   chartDirection?: ChartDirection;
   showLegend?: boolean;
+  /** Master switch for the status rails. Undefined means "on". */
+  showStatus?: boolean;
 };
 
 /** The unit a chart's integer offsets are measured in. */
