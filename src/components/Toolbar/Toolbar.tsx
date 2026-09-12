@@ -45,6 +45,8 @@ import { effectiveFontSize } from '@/utils/activity';
 import { MONTH_NAMES_SHORT } from '@/constants/timeline';
 import { getTotalMonths, getTotalWeeks } from '@/utils/timeline';
 import { fitUnitWidth } from '@/utils/layout';
+import { hasAnyTopic } from '@/utils/topics';
+import { activeChart } from '@/stores/selectors';
 import { SaveDialog } from '@/components/Dialogs/SaveDialog';
 import { AddRowDialog } from '@/components/Dialogs/AddRowDialog';
 import { HelpDialog } from '@/components/Dialogs/HelpDialog';
@@ -167,9 +169,11 @@ export function Toolbar() {
     if (totalUnits <= 0) return;
 
     // Same arithmetic as the sidebar drag, so the button and the drag agree to the pixel.
+    const state = useStore.getState();
     const clamped = fitUnitWidth({
       containerWidth: scrollContainer.clientWidth,
-      sidebarWidth: useStore.getState().sidebarWidth,
+      sidebarWidth: state.sidebarWidth,
+      leadingWidth: hasAnyTopic(activeChart(state).rows) ? state.topicWidth : 0,
       totalUnits,
       min: minWidth,
       max: maxWidth,

@@ -19,8 +19,11 @@
   --color-foreground: #1a1d23;
   --color-muted: #f0f2f5;
   --color-muted-foreground: #6b7280;
-  --color-border: #e5e7eb;
-  --color-border-subtle: #f0f2f5;
+  /* Same fix as the dark block below: #e5e7eb scored 1.20:1 and #f0f2f5 1.08:1 against this
+     background, so a divider drawn in them was invisible in BOTH themes. `border` clears 3:1;
+     `border-subtle`, the row hairline, sits near 2:1 by choice. */
+  --color-border: #8d94a3;
+  --color-border-subtle: #b4bac6;
   --color-ring: #6366f1;
   --color-primary: #6366f1;
   --color-primary-foreground: #ffffff;
@@ -84,8 +87,14 @@
   --color-foreground: #e2e4e9;
   --color-muted: #1a1d27;
   --color-muted-foreground: #8b8fa3;
-  --color-border: #2a2d3a;
-  --color-border-subtle: #1e2130;
+  /* Borders carry meaning in dark mode and were losing it: #2a2d3a scored 1.38:1 against the
+     background and #1e2130 scored 1.18:1 — a divider at that contrast is a control nobody can
+     find, which is exactly what happened to the row-names resize handle. `border` now clears
+     the 3:1 floor WCAG 1.4.11 asks of a UI boundary; `border-subtle` is the row hairline and
+     stays quieter on purpose, lifted to roughly 2:1 so rows read as separated without the
+     chart turning into a ruled grid. */
+  --color-border: #5a6072;
+  --color-border-subtle: #3d4252;
   --color-ring: #818cf8;
   --color-primary: #818cf8;
   --color-primary-foreground: #0f1117;

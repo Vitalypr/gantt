@@ -1,6 +1,6 @@
 # Handoff
 
-_Updated 2026-09-12 · branch `main` · pushed at `0fc653c` and deployed to gh-pages_
+_Updated 2026-09-12 · branch `main` · deployed to gh-pages_
 
 ## State
 
@@ -31,6 +31,10 @@ kept recurring.
   identical types, so a misroute compiled fine; now it is a type error. Narrow on `chart.unit`.
 - **One gesture, one commit.** `moveActivity`, `setActivityRowSpan`, `transformActivities`,
   `updateActivities`, `removeActivities` are compound so a gesture never costs two Ctrl+Z.
+- **Row pitch is NOT uniform any more.** A topic gap (`TOPIC_GAP`) sits between topic blocks,
+  so `Math.round(dy / rowHeight)` no longer finds the row under the pointer. `rowIndexAtY` in
+  `utils/layout.ts` hit-tests the rendered bands instead, and `useDragMove` / `useDragRowSpan`
+  both go through it. Any new code that turns a y into a row must do the same.
 - **`Activity.status` is drawn as a rail, and the rail's height is a contract.** The rail is
   absolutely positioned inside the bar's bottom edge, so the only height it costs the label is
   `STATUS_RAIL_RESERVE`, added as the bar's `paddingBottom` and only while a rail is drawn. The

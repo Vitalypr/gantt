@@ -374,7 +374,15 @@ export function normalizeChart<T extends Chart>(chart: T): T {
   const rows = [...(chart.rows ?? [])]
     .filter((r) => r && typeof r.id === 'string')
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-    .map((r, i) => ({ ...r, order: i, activityIds: [...(r.activityIds ?? [])] }));
+    .map((r, i) => ({
+      ...r,
+      order: i,
+      activityIds: [...(r.activityIds ?? [])],
+      // Blank topics would keep the column alive with an empty cell, and a merge flag with no
+      // topic above it would claim rows for a cell that does not exist.
+      topic: typeof r.topic === 'string' && r.topic.trim() !== '' ? r.topic.trim() : undefined,
+      topicMergedWithNext: r.topicMergedWithNext === true ? true : undefined,
+    }));
 
   const activities = (chart.activities ?? []).filter((a) => a && typeof a.id === 'string');
   const byId = new Map(activities.map((a) => [a.id, a]));
@@ -393,7 +401,14 @@ export function normalizeChart<T extends Chart>(chart: T): T {
   const orphans = activities.filter((a) => !claimed.has(a.id));
   if (orphans.length > 0) {
     if (rows.length === 0) {
-      rows.push({ id: `row-${Math.random().toString(36).slice(2, 10)}`, name: '', order: 0, activityIds: [] });
+      rows.push({
+        id: `row-${Math.random().toString(36).slice(2, 10)}`,
+        name: '',
+        order: 0,
+        activityIds: [],
+        topic: undefined,
+        topicMergedWithNext: undefined,
+      });
     }
     for (const o of orphans) rows[0]!.activityIds.push(o.id);
   }

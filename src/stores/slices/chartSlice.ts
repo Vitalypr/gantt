@@ -38,6 +38,10 @@ export type ChartSlice = {
   renameRow: (rowId: string, name: string) => void;
   removeRow: (rowId: string) => void;
   toggleRowMerge: (rowId: string) => void;
+  /** Label for the sideways topic column. Empty string clears it. */
+  setRowTopic: (rowId: string, topic: string) => void;
+  /** Join or split this row's TOPIC cell with the next row's. */
+  toggleRowTopicMerge: (rowId: string) => void;
   toggleRowGroup: (rowId: string) => void;
   toggleRowCollapsed: (rowId: string) => void;
   moveRow: (rowId: string, direction: 'up' | 'down') => void;
@@ -281,6 +285,37 @@ export const createChartSlice: StateCreator<ChartSlice & ModeDeps, [['zustand/im
         c.rows = c.rows.filter((r) => r.id !== rowId);
         c.updatedAt = new Date().toISOString();
       }
+    }),
+
+  setRowTopic: (rowId, topic) =>
+    set((state) => {
+      const chart = withActive(state);
+      const row = chart.rows.find((r) => r.id === rowId);
+      if (!row) return;
+      const next = topic.trim();
+      // Undefined, not '': the topic column only exists when a row genuinely carries one, and
+      // an empty string would keep it alive with a blank cell.
+      row.topic = next === '' ? undefined : next;
+      if (next === '') row.topicMergedWithNext = undefined;
+      chart.updatedAt = new Date().toISOString();
+    }),
+
+  toggleRowTopicMerge: (rowId) =>
+    set((state) => {
+      const chart = withActive(state);
+      const ordered = [...chart.rows].sort((a, b) => a.order - b.order);
+      const i = ordered.findIndex((r) => r.id === rowId);
+      // The last row joins nothing: a flag there would leave a cell claiming a row that is
+      // not there, which is the same class of bug `mergedWithNext` has on the last row.
+      if (i < 0 || i >= ordered.length - 1) return;
+      const row = ordered[i]!;
+      const joining = !row.topicMergedWithNext;
+      row.topicMergedWithNext = joining ? true : undefined;
+      if (joining) {
+        // A follower's own label would be unreachable — the cell shows the leader's.
+        ordered[i + 1]!.topic = undefined;
+      }
+      chart.updatedAt = new Date().toISOString();
     }),
 
   toggleRowMerge: (rowId) =>

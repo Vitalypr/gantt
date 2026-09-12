@@ -2,6 +2,9 @@ import type { StateCreator } from 'zustand';
 import {
   DEFAULT_MONTH_WIDTH,
   DEFAULT_SIDEBAR_WIDTH,
+  DEFAULT_TOPIC_WIDTH,
+  MIN_TOPIC_WIDTH,
+  MAX_TOPIC_WIDTH,
   DEFAULT_WEEK_WIDTH,
   MIN_MONTH_WIDTH,
   MAX_MONTH_WIDTH,
@@ -31,6 +34,8 @@ export type UiSlice = {
   weekWidth: number;
   effectiveWeekWidth: number;
   sidebarWidth: number;
+  /** Width of the sideways topic column, when any row carries a topic. */
+  topicWidth: number;
   /** Selection is a SET: bulk recolour, bulk delete and range select all need more than
    *  one. Order is selection order, so the first entry is the anchor. */
   selectedActivityIds: string[];
@@ -54,6 +59,7 @@ export type UiSlice = {
   setWeekWidth: (width: number) => void;
   setEffectiveWeekWidth: (width: number) => void;
   setSidebarWidth: (width: number) => void;
+  setTopicWidth: (width: number) => void;
   selectActivity: (selection: SelectedActivity | null) => void;
   toggleActivitySelection: (activityId: string) => void;
   selectActivities: (activityIds: string[]) => void;
@@ -76,6 +82,7 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   weekWidth: DEFAULT_WEEK_WIDTH,
   effectiveWeekWidth: DEFAULT_WEEK_WIDTH,
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+  topicWidth: DEFAULT_TOPIC_WIDTH,
   selectedActivityIds: [],
   editingActivity: null,
   selectedDependency: null,
@@ -133,6 +140,11 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   setSidebarWidth: (width) =>
     set((state) => {
       state.sidebarWidth = width;
+    }),
+
+  setTopicWidth: (width) =>
+    set((state) => {
+      state.topicWidth = Math.max(MIN_TOPIC_WIDTH, Math.min(MAX_TOPIC_WIDTH, width));
     }),
 
   selectActivity: (selection) =>

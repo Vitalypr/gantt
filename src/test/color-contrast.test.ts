@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { contrastRatio, isColorDark, pickLabelColor, LABEL_DARK, LABEL_LIGHT } from '@/utils/color';
 import {
   ACTIVITY_COLOR_GROUPS,
@@ -120,4 +122,45 @@ describe('palette matrix', () => {
     expect(BASE_TONE_COLORS).toContain(DEFAULT_ACTIVITY_COLOR);
     expect(COLOR_TONES[BASE_TONE_INDEX]).toBe(500);
   });
+});
+
+/**
+ * Theme tokens, read from `src/index.css` rather than restated here — a test that hardcodes
+ * the values it checks passes forever while the stylesheet drifts away from it.
+ */
+describe('theme borders are visible in both themes', () => {
+  const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
+
+  const tokenIn = (block: 'light' | 'dark', name: string): string => {
+    // The light palette lives in `@theme {`, the dark override in `.dark {`. Search forward
+    // from the marker and take the first declaration: bounding on the next `}` breaks on the
+    // nested at-rules in between.
+    const start = css.indexOf(block === 'dark' ? '.dark {' : '@theme {');
+    if (start < 0) throw new Error(`${block} block not found`);
+    const match = new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`).exec(css.slice(start));
+    if (!match) throw new Error(`${name} not found in the ${block} block`);
+    return match[1]!;
+  };
+
+  it.each([
+    ['light', '--color-background', '--color-border'],
+    ['dark', '--color-background', '--color-border'],
+  ] as const)('%s: --color-border clears the 3:1 floor for a UI boundary', (block, bgName, name) => {
+    const ratio = contrastRatio(tokenIn(block, name), tokenIn(block, bgName));
+    expect(ratio, `${block} ${name} scored ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(2.9);
+  });
+
+  it.each(['light', 'dark'] as const)(
+    '%s: --color-border-subtle is quiet but not invisible',
+    (block) => {
+      const ratio = contrastRatio(
+        tokenIn(block, '--color-border-subtle'),
+        tokenIn(block, '--color-background'),
+      );
+      // Deliberately below 3:1 — it is a row hairline, not a component boundary — but a
+      // divider under about 1.5:1 cannot be seen at all, which is what it used to be.
+      expect(ratio, `${block} subtle scored ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(1.8);
+      expect(ratio).toBeLessThan(3);
+    },
+  );
 });

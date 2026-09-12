@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useStore } from '@/stores';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
+import { rowIndexAtY, timelineBodyTop } from '@/utils/layout';
 import type { RowLayout } from '@/components/GanttChart/GanttChart';
 import { useLatest } from '@/hooks/useLatest';
 
@@ -38,6 +39,7 @@ export function useDragRowSpan(rows: RowLayout[]) {
       startYRef.current = e.clientY;
       isDraggingRef.current = false;
 
+      const bodyTop = timelineBodyTop();
       const target = e.target as HTMLElement;
       target.setPointerCapture(e.pointerId);
 
@@ -64,7 +66,10 @@ export function useDragRowSpan(rows: RowLayout[]) {
           });
         }
 
-        const rowDelta = Math.round(deltaY / rh);
+        // From the rendered bands, not a pitch: a topic gap makes the pitch non-uniform and
+        // `deltaY / rh` then over-counts a row for every gap the pointer crosses.
+        const hit = rowIndexAtY(sortedRows, rh, moveEvent.clientY - bodyTop);
+        const rowDelta = hit >= 0 && rowIndex >= 0 ? hit - rowIndex : Math.round(deltaY / rh);
 
         if (direction === 'bottom') {
           // Bottom edge: positive delta = expand, negative = shrink

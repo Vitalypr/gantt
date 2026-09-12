@@ -2,7 +2,8 @@ import { useCallback } from 'react';
 import { useStore } from '@/stores';
 import { useLatest } from '@/hooks/useLatest';
 import { useChartDirection } from '@/hooks/useChartDirection';
-import { totalUnits as selectTotalUnits } from '@/stores/selectors';
+import { activeChart, totalUnits as selectTotalUnits } from '@/stores/selectors';
+import { hasAnyTopic } from '@/utils/topics';
 import { fitUnitWidth, sidebarWidthFromDrag } from '@/utils/layout';
 import {
   MIN_MONTH_WIDTH,
@@ -10,6 +11,35 @@ import {
   MIN_WEEK_WIDTH,
   MAX_WEEK_WIDTH,
 } from '@/constants/timeline';
+
+/**
+ * Re-divide the space beside the sidebar among the unit columns.
+ *
+ * Every timeline column shares one width, so re-fitting is what keeps them equal to each other
+ * while the space they divide changes. Module scope, not inside the gesture, because the drag
+ * and the keyboard step must do exactly the same thing.
+ */
+function refitColumnsFor(
+  width: number,
+  setMonthWidth: (w: number) => void,
+  setWeekWidth: (w: number) => void,
+): void {
+  const scroll = document.querySelector('[data-gantt-scroll]');
+  if (!scroll) return;
+  const state = useStore.getState();
+  const weeks = state.timelineMode === 'weeks';
+  const fitted = fitUnitWidth({
+    containerWidth: scroll.clientWidth,
+    sidebarWidth: width,
+    leadingWidth: hasAnyTopic(activeChart(state).rows) ? state.topicWidth : 0,
+    totalUnits: selectTotalUnits(state),
+    min: weeks ? MIN_WEEK_WIDTH : MIN_MONTH_WIDTH,
+    max: weeks ? MAX_WEEK_WIDTH : MAX_MONTH_WIDTH,
+  });
+  if (fitted === null) return;
+  if (weeks) setWeekWidth(fitted);
+  else setMonthWidth(fitted);
+}
 
 export function useResizeSidebar() {
   const setSidebarWidth = useStore((s) => s.setSidebarWidth);
@@ -36,26 +66,7 @@ export function useResizeSidebar() {
       const handlePointerMove = (moveEvent: PointerEvent) => {
         const width = sidebarWidthFromDrag(startWidth, moveEvent.clientX - startX, rtl);
         setSidebarWidth(width);
-        refitColumns(width);
-      };
-
-      // Every timeline column shares one width, so re-fitting is what keeps them equal to each
-      // other while the space they divide changes.
-      const refitColumns = (width: number) => {
-        const scroll = document.querySelector('[data-gantt-scroll]');
-        if (!scroll) return;
-        const state = useStore.getState();
-        const weeks = state.timelineMode === 'weeks';
-        const fitted = fitUnitWidth({
-          containerWidth: scroll.clientWidth,
-          sidebarWidth: width,
-          totalUnits: selectTotalUnits(state),
-          min: weeks ? MIN_WEEK_WIDTH : MIN_MONTH_WIDTH,
-          max: weeks ? MAX_WEEK_WIDTH : MAX_MONTH_WIDTH,
-        });
-        if (fitted === null) return;
-        if (weeks) setWeekWidth(fitted);
-        else setMonthWidth(fitted);
+        refitColumnsFor(width, setMonthWidth, setWeekWidth);
       };
 
       const end = () => {
@@ -75,5 +86,15 @@ export function useResizeSidebar() {
     [setSidebarWidth, setMonthWidth, setWeekWidth, isRtlRef],
   );
 
-  return { onPointerDown };
+  /** Same width change, same re-fit, from the keyboard. */
+  const onStep = useCallback(
+    (delta: number) => {
+      const width = sidebarWidthFromDrag(useStore.getState().sidebarWidth, delta, false);
+      setSidebarWidth(width);
+      refitColumnsFor(width, setMonthWidth, setWeekWidth);
+    },
+    [setSidebarWidth, setMonthWidth, setWeekWidth],
+  );
+
+  return { onPointerDown, onStep };
 }

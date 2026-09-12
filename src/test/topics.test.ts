@@ -1,0 +1,186 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { useStore } from '@/stores';
+import { resolveTopicBands, hasAnyTopic } from '@/utils/topics';
+import type { GanttRow, MonthsChart } from '@/types/gantt';
+
+const row = (id: string, extra: Partial<GanttRow> = {}): GanttRow => ({
+  id,
+  name: id,
+  order: 0,
+  activityIds: [],
+  ...extra,
+});
+
+describe('resolveTopicBands', () => {
+  it('gives a lone topic row a cell of span 1', () => {
+    const { cells } = resolveTopicBands([row('a', { topic: 'Design' })]);
+    expect(cells).toEqual([{ leaderRowId: 'a', label: 'Design', startIndex: 0, span: 1 }]);
+  });
+
+  it('spans a cell across rows joined downward', () => {
+    const rows = [
+      row('a', { topic: 'Design', topicMergedWithNext: true }),
+      row('b', { topicMergedWithNext: true }),
+      row('c'),
+    ];
+    expect(resolveTopicBands(rows).cells).toEqual([
+      { leaderRowId: 'a', label: 'Design', startIndex: 0, span: 3 },
+    ]);
+  });
+
+  it('stops the run at the first row that does not join downward', () => {
+    const rows = [
+      row('a', { topic: 'Design', topicMergedWithNext: true }),
+      row('b'),
+      row('c', { topic: 'Build' }),
+    ];
+    const { cells } = resolveTopicBands(rows);
+    expect(cells.map((c) => [c.leaderRowId, c.span])).toEqual([['a', 2], ['c', 1]]);
+  });
+
+  it('does not run a cell off the end when the last row still joins downward', () => {
+    const rows = [
+      row('a', { topic: 'Design', topicMergedWithNext: true }),
+      row('b', { topicMergedWithNext: true }),
+    ];
+    const { cells } = resolveTopicBands(rows);
+    expect(cells[0]!.span).toBe(2);
+  });
+
+  it('treats a blank or whitespace topic as no topic', () => {
+    const { cells } = resolveTopicBands([row('a', { topic: '   ' }), row('b', { topic: '' })]);
+    expect(cells).toEqual([]);
+  });
+
+  it('ignores a merge flag on a row that carries no topic', () => {
+    const rows = [row('a', { topicMergedWithNext: true }), row('b')];
+    expect(resolveTopicBands(rows).cells).toEqual([]);
+  });
+});
+
+describe('gaps between topics', () => {
+  const ids = (rows: GanttRow[]) => [...resolveTopicBands(rows).gapBefore];
+
+  it('puts no gap in a chart with no topics at all', () => {
+    expect(ids([row('a'), row('b'), row('c')])).toEqual([]);
+  });
+
+  it('never puts a gap above the first row', () => {
+    const rows = [row('a', { topic: 'Design' }), row('b', { topic: 'Build' })];
+    expect(ids(rows)).not.toContain('a');
+  });
+
+  it('separates two adjacent topics', () => {
+    const rows = [
+      row('a', { topic: 'Design', topicMergedWithNext: true }),
+      row('b'),
+      row('c', { topic: 'Build' }),
+    ];
+    expect(ids(rows)).toEqual(['c']);
+  });
+
+  it('does not break a topic in the middle of its own run', () => {
+    const rows = [
+      row('a', { topic: 'Design', topicMergedWithNext: true }),
+      row('b', { topicMergedWithNext: true }),
+      row('c', { topicMergedWithNext: true }),
+      row('d'),
+    ];
+    expect(ids(rows)).toEqual([]);
+  });
+
+  it('brackets an untopiced row sitting between two topics', () => {
+    const rows = [
+      row('a', { topic: 'Design' }),
+      row('b'),
+      row('c', { topic: 'Build' }),
+    ];
+    expect(ids(rows)).toEqual(['b', 'c']);
+  });
+
+  it('separates plain rows from a topic that follows them', () => {
+    const rows = [row('a'), row('b'), row('c', { topic: 'Build' })];
+    expect(ids(rows)).toEqual(['c']);
+  });
+
+  it('adds one gap per boundary, never two for the same row', () => {
+    const rows = [
+      row('a', { topic: 'A' }),
+      row('b', { topic: 'B' }),
+      row('c', { topic: 'C' }),
+    ];
+    expect(ids(rows)).toEqual(['b', 'c']);
+  });
+});
+
+describe('hasAnyTopic', () => {
+  it('is false for an untouched chart, so the column stays hidden', () => {
+    expect(hasAnyTopic([row('a'), row('b')])).toBe(false);
+    expect(hasAnyTopic([row('a', { topic: '  ' })])).toBe(false);
+  });
+
+  it('is true as soon as one row carries a topic', () => {
+    expect(hasAnyTopic([row('a'), row('b', { topic: 'Build' })])).toBe(true);
+  });
+});
+
+describe('topic mutators', () => {
+  const seed = (): MonthsChart => ({
+    id: 'c', unit: 'month', name: 'T',
+    startYear: 2026, startMonth: 1, endYear: 2026, endMonth: 12,
+    rows: [
+      { id: 'r1', name: '', order: 0, activityIds: [] },
+      { id: 'r2', name: '', order: 1, activityIds: [] },
+      { id: 'r3', name: '', order: 2, activityIds: [] },
+    ],
+    activities: [], dependencies: [], createdAt: 'x', updatedAt: 'x',
+  });
+
+  const rowsOf = () => useStore.getState().chart.rows;
+
+  beforeEach(() => {
+    useStore.getState().setChart(seed());
+  });
+
+  it('sets and trims a topic', () => {
+    useStore.getState().setRowTopic('r1', '  Design  ');
+    expect(rowsOf()[0]!.topic).toBe('Design');
+  });
+
+  it('clears to undefined rather than an empty string, so the column can disappear', () => {
+    useStore.getState().setRowTopic('r1', 'Design');
+    useStore.getState().setRowTopic('r1', '');
+    expect(rowsOf()[0]!.topic).toBeUndefined();
+  });
+
+  it('drops the merge flag when the topic is cleared', () => {
+    useStore.getState().setRowTopic('r1', 'Design');
+    useStore.getState().toggleRowTopicMerge('r1');
+    useStore.getState().setRowTopic('r1', '');
+    expect(rowsOf()[0]!.topicMergedWithNext).toBeUndefined();
+  });
+
+  it('joins and splits a topic cell', () => {
+    useStore.getState().toggleRowTopicMerge('r1');
+    expect(rowsOf()[0]!.topicMergedWithNext).toBe(true);
+    useStore.getState().toggleRowTopicMerge('r1');
+    expect(rowsOf()[0]!.topicMergedWithNext).toBeUndefined();
+  });
+
+  it('clears a follower label on join, since the cell shows the leader label', () => {
+    useStore.getState().setRowTopic('r1', 'Design');
+    useStore.getState().setRowTopic('r2', 'Stray');
+    useStore.getState().toggleRowTopicMerge('r1');
+    expect(rowsOf()[1]!.topic).toBeUndefined();
+  });
+
+  it('refuses to join the last row, which has nothing below it', () => {
+    useStore.getState().toggleRowTopicMerge('r3');
+    expect(rowsOf()[2]!.topicMergedWithNext).toBeUndefined();
+  });
+
+  it('leaves name merging alone — the two are separate', () => {
+    useStore.getState().toggleRowTopicMerge('r1');
+    expect(rowsOf()[0]!.mergedWithNext).toBeUndefined();
+  });
+});

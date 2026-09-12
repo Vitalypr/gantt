@@ -34,6 +34,11 @@ export type GanttRow = {
   name: string;
   order: number;
   activityIds: string[];
+  /** Label for the sideways topic column. Only the first row of a merged run carries it. */
+  topic?: string;
+  /** This row's TOPIC cell joins the next row's. Distinct from `mergedWithNext`, which
+   *  merges name cells: a topic spans rows whose names stay separate. */
+  topicMergedWithNext?: boolean;
   /** If true, this row's name cell is merged with the next row below */
   mergedWithNext?: boolean;
   /** Marks this row as a phase header. The rows after it, up to the next header, belong to it. */

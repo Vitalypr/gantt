@@ -87,13 +87,15 @@ export function getHeaderHeight(mode: TimelineMode, showQuarters: boolean): numb
 export function fitUnitWidth(args: {
   containerWidth: number;
   sidebarWidth: number;
+  /** Any fixed track before the sidebar — today, the topic column. */
+  leadingWidth?: number;
   totalUnits: number;
   min: number;
   max: number;
 }): number | null {
-  const { containerWidth, sidebarWidth, totalUnits, min, max } = args;
+  const { containerWidth, sidebarWidth, leadingWidth = 0, totalUnits, min, max } = args;
   if (totalUnits <= 0) return null;
-  const available = containerWidth - sidebarWidth;
+  const available = containerWidth - sidebarWidth - leadingWidth;
   return Math.max(min, Math.min(max, Math.floor(available / totalUnits)));
 }
 
@@ -111,4 +113,40 @@ export function fitUnitWidth(args: {
 export function sidebarWidthFromDrag(startWidth: number, dx: number, isRtl: boolean): number {
   const raw = startWidth + (isRtl ? -dx : dx);
   return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, raw));
+}
+
+/** A rendered row band: where it starts, in timeline-body coordinates. */
+export type RowBand = { rowId: string; y: number };
+
+/**
+ * Index of the row at `y`, in timeline-body coordinates.
+ *
+ * Hit-tests the actual bands instead of dividing by a pitch. Row pitch stops being uniform the
+ * moment anything puts empty space between rows — a topic gap, a group break — and
+ * `Math.round(dy / rowHeight)` is then wrong by a growing amount for every gap crossed, which
+ * shows up as a bar landing one row off, silently and only sometimes.
+ *
+ * A pointer inside a gap resolves to the nearer row rather than to nothing, so a drag released
+ * between two blocks still commits somewhere sensible.
+ */
+export function rowIndexAtY(rows: RowBand[], rowHeight: number, y: number): number {
+  if (rows.length === 0) return -1;
+  let best = 0;
+  let bestDistance = Infinity;
+  for (let i = 0; i < rows.length; i++) {
+    const top = rows[i]!.y;
+    const bottom = top + rowHeight;
+    if (y >= top && y < bottom) return i;
+    const distance = y < top ? top - y : y - bottom;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = i;
+    }
+  }
+  return best;
+}
+
+/** Top of `[data-timeline-body]` in client space — the origin row `y` values are measured from. */
+export function timelineBodyTop(): number {
+  return document.querySelector('[data-timeline-body]')?.getBoundingClientRect().top ?? 0;
 }

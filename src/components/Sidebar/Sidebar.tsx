@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Pencil, Trash2, Plus, Merge, SplitSquareVertical, ArrowUp, ArrowDown, FolderTree, ChevronDown, ChevronRight } from 'lucide-react';
+import { Pencil, Trash2, Plus, Merge, SplitSquareVertical, ArrowUp, ArrowDown, FolderTree, ChevronDown, ChevronRight, Tag, Link2, Unlink } from 'lucide-react';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { useStore } from '@/stores';
 import { useChartDirection } from '@/hooks/useChartDirection';
@@ -26,9 +26,11 @@ type SidebarProps = {
   rows: Row[];
   sidebarWidth: number;
   onResizePointerDown: (e: React.PointerEvent) => void;
+  /** Nudge the width by `delta` px — the keyboard path for the same control. */
+  onResizeStep: (delta: number) => void;
 };
 
-export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProps) {
+export function Sidebar({ rows, sidebarWidth, onResizePointerDown, onResizeStep }: SidebarProps) {
   const { isRtl } = useChartDirection();
   const rowSize = useStore((s) => s.rowSize);
   const rowHeight = ROW_SIZE_MAP[rowSize];
@@ -37,6 +39,8 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProp
   const renameRow = useStore((s) => s.renameRow);
   const removeRow = useStore((s) => s.removeRow);
   const toggleRowMerge = useStore((s) => s.toggleRowMerge);
+  const setRowTopic = useStore((s) => s.setRowTopic);
+  const toggleRowTopicMerge = useStore((s) => s.toggleRowTopicMerge);
   const moveRow = useStore((s) => s.moveRow);
   const toggleRowGroup = useStore((s) => s.toggleRowGroup);
   const toggleRowCollapsed = useStore((s) => s.toggleRowCollapsed);
@@ -161,6 +165,33 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProp
                 </ContextMenuItem>
               )}
               <ContextMenuSeparator />
+              {/* Topic cells merge independently of name cells: a topic spans rows whose
+                  names stay separate, which is the whole point of the column. */}
+              {/* No prompt(): the app renames everything else inline, and a modal here would be
+                  the only blocking dialog in the product. Setting a topic makes the column
+                  appear with a placeholder; double-clicking the cell edits it in place. */}
+              <ContextMenuItem
+                onClick={() => setRowTopic(row.rowId, rowData?.topic ? '' : 'Topic')}
+              >
+                <Tag className="mr-2 h-3.5 w-3.5" />
+                {rowData?.topic ? 'Clear Topic' : 'Set Topic'}
+              </ContextMenuItem>
+              {canMergeDown && (
+                <ContextMenuItem onClick={() => toggleRowTopicMerge(row.rowId)}>
+                  {rowData?.topicMergedWithNext ? (
+                    <>
+                      <Unlink className="mr-2 h-3.5 w-3.5" />
+                      Split Topic Below
+                    </>
+                  ) : (
+                    <>
+                      <Link2 className="mr-2 h-3.5 w-3.5" />
+                      Join Topic with Below
+                    </>
+                  )}
+                </ContextMenuItem>
+              )}
+              <ContextMenuSeparator />
               <ContextMenuItem
                 className="text-destructive"
                 onClick={() => removeRow(row.rowId)}
@@ -173,15 +204,40 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProp
         );
       })}
 
-      {/* Resize handle — wide touch target with thin visible line.
-          Sits on the edge the sidebar SHARES with the timeline, which is physically left in
-          RTL. `right` there put it against the window edge, half of it off-screen. */}
+      {/* Resize handle — wide touch target on the edge the sidebar SHARES with the timeline,
+          which is physically left in RTL; `right` there put it against the window edge.
+
+          It carries a visible grip, not just a hairline. A 1px line indistinguishable from the
+          column border is a control nobody finds: this divider has been reported as missing
+          three times, and it was there the whole while. */}
       <div
-        className="absolute top-0 z-20 h-full w-5 cursor-col-resize group"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize row names column"
+        tabIndex={0}
+        className="absolute top-0 z-20 h-full w-5 cursor-col-resize group focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
         style={isRtl ? { touchAction: 'none', left: -10 } : { touchAction: 'none', right: -10 }}
         onPointerDown={onResizePointerDown}
+        onKeyDown={(e) => {
+          // Keyboard path: the drag is pointer-only, and this is the one control whose whole
+          // job is a width the user may want to nudge precisely.
+          const step = e.shiftKey ? 32 : 8;
+          if (e.key === 'ArrowLeft') onResizeStep(isRtl ? step : -step);
+          else if (e.key === 'ArrowRight') onResizeStep(isRtl ? -step : step);
+          else return;
+          e.preventDefault();
+        }}
       >
-        <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-border group-hover:bg-ring/50 group-active:bg-ring transition-colors" />
+        <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2 bg-border transition-colors group-hover:bg-ring/60 group-active:bg-ring" />
+        {/* Grip: three dots, centred vertically, always visible but low-contrast until hover. */}
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-[3px] rounded-full bg-background px-[3px] py-1 opacity-70 transition-opacity group-hover:opacity-100"
+          aria-hidden
+        >
+          <span className="block h-[3px] w-[3px] rounded-full bg-muted-foreground group-hover:bg-ring" />
+          <span className="block h-[3px] w-[3px] rounded-full bg-muted-foreground group-hover:bg-ring" />
+          <span className="block h-[3px] w-[3px] rounded-full bg-muted-foreground group-hover:bg-ring" />
+        </div>
       </div>
     </div>
   );

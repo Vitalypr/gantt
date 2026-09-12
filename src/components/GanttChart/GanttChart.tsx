@@ -1,10 +1,12 @@
 import { useRef, useMemo, useEffect, useState } from 'react';
 import { useStore } from '@/stores';
-import { ROW_SIZE_MAP } from '@/constants/timeline';
+import { ROW_SIZE_MAP, TOPIC_GAP } from '@/constants/timeline';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { getTotalMonths, getTotalWeeks } from '@/utils/timeline';
 import { bodyHeightFor, getHeaderHeight } from '@/utils/layout';
 import { resolveRowGroups } from '@/utils/rowGroups';
+import { resolveTopicBands, hasAnyTopic } from '@/utils/topics';
+import { TopicColumn } from '@/components/Sidebar/TopicColumn';
 import { useChartDirection } from '@/hooks/useChartDirection';
 import { useAnchoredZoom } from '@/hooks/useAnchoredZoom';
 import { TimelineHeader } from '@/components/Timeline/TimelineHeader';
@@ -53,10 +55,14 @@ export function GanttChart() {
   const setEffectiveMonthWidth = useStore((s) => s.setEffectiveMonthWidth);
   const setEffectiveWeekWidth = useStore((s) => s.setEffectiveWeekWidth);
 
+  const topicWidth = useStore((s) => s.topicWidth);
+  // The column exists as soon as ANY row carries a topic — including one hidden inside a
+  // collapsed group, so collapsing does not make the whole chart shift sideways.
+  const topicsShown = hasAnyTopic(chartRows);
+  const leadingWidth = topicsShown ? topicWidth : 0;
   const { isRtl } = useChartDirection();
   const checkSidebarDoubleTap = useDoubleTap();
   const dragCreate = useDragCreate();
-  const dragMove = useDragMove();
   const dragResize = useDragResize();
   const resizeSidebar = useResizeSidebar();
 
@@ -80,8 +86,9 @@ export function GanttChart() {
     return () => observer.disconnect();
   }, []);
 
-  // Compute effective unit width: ensure chart fills viewport
-  const availableWidth = containerWidth - sidebarWidth;
+  // Compute effective unit width: ensure chart fills viewport. The topic column is a third
+  // fixed track, so it comes out of the space the units divide.
+  const availableWidth = containerWidth - sidebarWidth - leadingWidth;
   const fitWidth = totalUnits > 0 ? availableWidth / totalUnits : monthWidth;
   const effectiveUnitWidth = Math.max(monthWidth, fitWidth);
 
@@ -109,10 +116,16 @@ export function GanttChart() {
     [chartRows, chartActivities],
   );
 
+  // Topic cells and the gaps between them. One resolution, shared by the layout below and by
+  // the column itself, so the rotated cell and the rows it spans cannot disagree.
+  const topics = useMemo(() => resolveTopicBands(visibleRows), [visibleRows]);
   const rowLayout = useMemo(() => {
     const rows: RowLayout[] = [];
     let y = 0;
     for (const row of visibleRows) {
+      // Empty canvas between topic blocks. It is not a row: nothing can be dropped in it, and
+      // it only exists once some row actually carries a topic.
+      if (topicsShown && topics.gapBefore.has(row.id)) y += TOPIC_GAP;
       rows.push({
         rowId: row.id,
         activityIds: row.activityIds,
@@ -124,7 +137,8 @@ export function GanttChart() {
       y += rowHeight;
     }
     return { rows, totalHeight: y };
-  }, [visibleRows, rowHeight]);
+  }, [visibleRows, rowHeight, topics, topicsShown]);
+  const dragMove = useDragMove(rowLayout.rows);
   const dragRowSpan = useDragRowSpan(rowLayout.rows);
   const dragConnect = useDragConnect(rowLayout.rows, effectiveUnitWidth);
 
@@ -132,8 +146,33 @@ export function GanttChart() {
   const bodyHeight = bodyHeightFor(rowLayout.totalHeight);
   const hasRows = chartRows.length > 0;
 
-  // The grid has four cells. Their DOM order decides which track each lands in, so the order
-  // and the track order are swapped together, in one place.
+  // The grid has four cells, or six once a topic column exists. Their DOM order decides which
+  // track each lands in, so the order and the track order are swapped together, in one place.
+  const topicCornerCell = (
+    <div
+      key="topic-corner"
+      className={cn(
+        'sticky top-0 z-30 border-b bg-background',
+        isRtl ? 'right-0 border-l' : 'left-0 border-r',
+      )}
+      style={{ width: leadingWidth, height: headerHeight }}
+    />
+  );
+
+  const topicCell = (
+    <div
+      key="topic"
+      className={cn('sticky z-10 bg-background', isRtl ? 'right-0 border-l' : 'left-0 border-r')}
+    >
+      <TopicColumn
+        rows={rowLayout.rows}
+        cells={topics.cells}
+        width={leadingWidth}
+        totalHeight={bodyHeight}
+      />
+    </div>
+  );
+
   const cornerCell = (
     <div
       key="corner"
@@ -186,6 +225,7 @@ export function GanttChart() {
         rows={rowLayout.rows}
         sidebarWidth={sidebarWidth}
         onResizePointerDown={resizeSidebar.onPointerDown}
+        onResizeStep={resizeSidebar.onStep}
       />
     </div>
   );
@@ -303,14 +343,20 @@ export function GanttChart() {
           // scroll origin — and deliberately not `gridColumn` on the children, because
           // sparse auto-placement would spill them into extra rows.
           gridTemplateColumns: isRtl
-            ? `${timelineWidth}px ${sidebarWidth}px`
-            : `${sidebarWidth}px ${timelineWidth}px`,
+            ? `${timelineWidth}px ${sidebarWidth}px${topicsShown ? ` ${leadingWidth}px` : ''}`
+            : `${topicsShown ? `${leadingWidth}px ` : ''}${sidebarWidth}px ${timelineWidth}px`,
           gridTemplateRows: `${headerHeight}px ${bodyHeight}px`,
         }}
       >
         {isRtl
-          ? [headerCell, cornerCell, bodyCell, sidebarCell]
-          : [cornerCell, headerCell, sidebarCell, bodyCell]}
+          ? [
+              headerCell, cornerCell, ...(topicsShown ? [topicCornerCell] : []),
+              bodyCell, sidebarCell, ...(topicsShown ? [topicCell] : []),
+            ]
+          : [
+              ...(topicsShown ? [topicCornerCell] : []), cornerCell, headerCell,
+              ...(topicsShown ? [topicCell] : []), sidebarCell, bodyCell,
+            ]}
       </div>
     </div>
   );

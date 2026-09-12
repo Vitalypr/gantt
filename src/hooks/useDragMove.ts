@@ -3,6 +3,8 @@ import { useStore } from '@/stores';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { clampStartUnit, deltaToUnits } from '@/utils/timeline';
 import { totalUnits as totalUnitsOf } from '@/stores/selectors';
+import { rowIndexAtY, timelineBodyTop } from '@/utils/layout';
+import { useLatest } from '@/hooks/useLatest';
 
 const DRAG_THRESHOLD = 4; // px minimum movement before drag starts
 
@@ -24,13 +26,16 @@ export type DragMoveState = {
  * written during render — both of which go stale mid-drag, and the latter is the
  * `react-hooks/refs` violation tracked as R-LINT.
  */
-export function useDragMove() {
+export function useDragMove(rows: { rowId: string; y: number }[]) {
   const moveActivity = useStore((s) => s.moveActivity);
   const [dragState, setDragState] = useState<DragMoveState>(null);
   const startXRef = useRef(0);
   const startYRef = useRef(0);
   const isDraggingRef = useRef(false);
   const latestRef = useRef<DragMoveState>(null);
+  // The rendered bands, which is what the pointer is actually over. Read live: a row added or
+  // a group collapsed mid-drag would otherwise leave this pointing at the old layout.
+  const rowsRef = useLatest(rows);
 
   const apply = (next: DragMoveState) => {
     latestRef.current = next;
@@ -45,6 +50,7 @@ export function useDragMove() {
       isDraggingRef.current = false;
 
       // Row order is fixed for the duration of a drag, so resolve it once here.
+      const bodyTop = timelineBodyTop();
       const chart = useStore.getState()._activeChart();
       const orderedRowIds = [...chart.rows]
         .sort((a, b) => a.order - b.order)
@@ -94,12 +100,21 @@ export function useDragMove() {
         );
         let rowOffset = 0;
         if (fromRowIndex >= 0) {
-          const wanted = Math.round((clientY - startYRef.current) / rowHeight);
-          const clamped = Math.max(
+          // Hit-test the rendered bands rather than dividing by a pitch. Topic gaps make the
+          // pitch non-uniform, and `Math.round(dy / rowHeight)` is then wrong by a growing
+          // amount for every gap crossed. Hit-testing is also what makes a collapsed group
+          // behave: the visible rows are the ones the pointer can actually be over.
+          const bands = rowsRef.current;
+          const hit = rowIndexAtY(bands, rowHeight, clientY - bodyTop);
+          const targetRowId = hit >= 0 ? bands[hit]?.rowId : undefined;
+          const targetOrdered = targetRowId ? orderedRowIds.indexOf(targetRowId) : -1;
+          const wanted = targetOrdered >= 0
+            ? targetOrdered - fromRowIndex
+            : Math.round((clientY - startYRef.current) / rowHeight);
+          rowOffset = Math.max(
             -fromRowIndex,
             Math.min(orderedRowIds.length - 1 - fromRowIndex, wanted),
           );
-          rowOffset = clamped;
         }
         // Guides are feedback, not constraint: positions are already integers, so alignment
         // happens by construction - what was missing was any sign that it had.

@@ -24,6 +24,19 @@ export const ROW_SIZE_MAP = {
  */
 export const DEFAULT_ROW_COUNT = 12;
 
+/**
+ * The sideways topic column.
+ *
+ * Narrow on purpose — it holds rotated text, so its width is the text's line height, not its
+ * length. The column only renders when some row actually carries a topic.
+ */
+export const DEFAULT_TOPIC_WIDTH = 34;
+export const MIN_TOPIC_WIDTH = 20;
+export const MAX_TOPIC_WIDTH = 120;
+
+/** Empty canvas between one topic block and the next. Not a row: nothing lands in it. */
+export const TOPIC_GAP = 10;
+
 export const DEFAULT_SIDEBAR_WIDTH = 240;
 export const MIN_SIDEBAR_WIDTH = 60;
 export const MAX_SIDEBAR_WIDTH = 400;
