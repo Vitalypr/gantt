@@ -76,6 +76,13 @@ kept recurring.
   to use the bundled browser instead.
 - **`build:exe:web` rebuilds `dist/` with `--base=./`**, leaving it unusable for gh-pages.
   Re-run `pnpm build` afterwards.
+- **The pre-commit hook keeps `dist-single` correct, but not byte-reproducible.** Tailwind's
+  scan is incremental across builds in the same working tree, so the hook's rebuild can carry
+  a rule for a class the source no longer uses — `bd8ca75` shipped both `bg-current/25` and
+  `bg-current/30` where a clean build emits only the second. Nothing is ever *missing*; the
+  artifact is just larger than a fresh build by the dead rules. To check, run `pnpm
+  build:single` and see whether `git diff dist-single/index.html` is empty; commit the result
+  if it is not.
 - **`dist-single/index.html` must stay `-text` in `.gitattributes`.** The inlined bundle holds
   raw CR bytes; `core.autocrlf` would rewrite them and the file would differ from every build.
   Its bytes also depend on the checkout: `index.html` and `public/favicon.svg` are inlined
