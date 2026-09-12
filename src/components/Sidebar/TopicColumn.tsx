@@ -28,9 +28,17 @@ export function TopicColumn({ rows, cells, width, totalHeight }: TopicColumnProp
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
 
   const indexOf = new Map(rows.map((r, i) => [r.rowId, i]));
+  // Rows no cell covers. The column is only ever visible because the user asked for it, so an
+  // uncovered row gets an empty slot to name rather than a blank strip that does nothing.
+  const covered = new Set<string>();
+  for (const cell of cells) {
+    const first = indexOf.get(cell.leaderRowId);
+    if (first === undefined) continue;
+    for (let k = 0; k < cell.span; k++) covered.add(rows[first + k]?.rowId ?? '');
+  }
 
   return (
-    <div className="relative" style={{ width, height: totalHeight }}>
+    <div className="relative bg-muted/20" style={{ width, height: totalHeight }}>
       {cells.map((cell) => {
         const first = indexOf.get(cell.leaderRowId);
         if (first === undefined) return null;
@@ -79,6 +87,29 @@ export function TopicColumn({ rows, cells, width, totalHeight }: TopicColumnProp
           </div>
         );
       })}
+
+      {rows.filter((r) => !covered.has(r.rowId)).map((r) => (
+        <div
+          key={`empty-${r.rowId}`}
+          data-topic-slot
+          data-row-id={r.rowId}
+          className={cn(
+            'absolute inset-x-0 flex cursor-text items-center justify-center',
+            'border-y border-dashed border-border-subtle text-[11px] leading-none',
+            // Visible at rest, not on hover. An empty slot that only appears under the cursor
+            // makes a switched-on column look like an empty strip with nothing in it.
+            'text-muted-foreground/70 transition-colors hover:bg-muted/40 hover:text-foreground',
+          )}
+          style={{ top: r.y, height: rowHeight }}
+          onDoubleClick={() => {
+            setRowTopic(r.rowId, 'Topic');
+            setEditingRowId(r.rowId);
+          }}
+          title="Double-click to name a topic"
+        >
+          +
+        </div>
+      ))}
     </div>
   );
 }

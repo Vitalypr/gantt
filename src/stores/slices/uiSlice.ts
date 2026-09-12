@@ -50,6 +50,9 @@ export type UiSlice = {
   findQuery: string | null;
   /** Master switch for every status rail on the canvas. */
   showStatus: boolean;
+  /** Whether the sideways topic column is shown. Off on a blank chart; the toolbar button
+   *  is what reveals it, and loading a chart that has topics turns it on. */
+  showTopics: boolean;
 
   zoomIn: () => void;
   zoomOut: () => void;
@@ -72,6 +75,7 @@ export type UiSlice = {
   toggleChartDirection: () => void;
   setFindQuery: (query: string | null) => void;
   setShowStatus: (show: boolean) => void;
+  setShowTopics: (show: boolean) => void;
 };
 
 export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []> = (set) => ({
@@ -91,6 +95,7 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   chartDirection: 'ltr' as ChartDirection,
   findQuery: null as string | null,
   showStatus: true,
+  showTopics: false,
 
   zoomIn: () =>
     set((state) => {
@@ -199,6 +204,11 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   setShowStatus: (show) =>
     set((state) => {
       state.showStatus = show;
+    }),
+
+  setShowTopics: (show) =>
+    set((state) => {
+      state.showTopics = show;
     }),
 
   setFindQuery: (query) =>

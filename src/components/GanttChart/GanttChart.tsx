@@ -55,10 +55,24 @@ export function GanttChart() {
   const setEffectiveWeekWidth = useStore((s) => s.setEffectiveWeekWidth);
 
   const topicWidth = useStore((s) => s.topicWidth);
-  // The column exists as soon as ANY row carries a topic — including one hidden inside a
-  // collapsed group, so collapsing does not make the whole chart shift sideways.
-  const topicsShown = hasAnyTopic(chartRows);
+  const showTopics = useStore((s) => s.showTopics);
+  const setShowTopics = useStore((s) => s.setShowTopics);
+  // Shown by the toolbar switch, not by whether a topic happens to exist. Deriving it from the
+  // data made the feature invisible on a blank chart — you had to already know to right-click
+  // a row before anything appeared, which is the trap the resize handle fell into too.
+  const topicsShown = showTopics;
   const leadingWidth = topicsShown ? topicWidth : 0;
+  const chartId = useStore((s) => (s.timelineMode === 'weeks' ? s.weeksChart.id : s.chart.id));
+
+  // A chart that arrives WITH topics reveals the column by itself — otherwise importing or
+  // opening one would show nothing and look like the topics had been lost.
+  useEffect(() => {
+    if (hasAnyTopic(chartRows) && !showTopics) setShowTopics(true);
+    // Keyed on the chart, not on the rows: re-running per edit would fight the switch every
+    // time the user turned it off while topics existed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chartId]);
+
   const { isRtl } = useChartDirection();
   const checkSidebarDoubleTap = useDoubleTap();
   const dragCreate = useDragCreate();

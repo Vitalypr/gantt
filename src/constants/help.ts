@@ -21,7 +21,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       { label: "Rename", body: "Double-click a row name. Hebrew, English and mixed text all read in the right direction automatically." },
       { label: "Reorder and delete", body: "Right-click a row for Move Up / Move Down / Delete." },
       { label: "Merge name cells", body: "Right-click a row and choose Merge with Below. This is cosmetic only - it joins the name cells and does not group the bars." },
-      { label: "Topics", body: "Right-click a row and choose Set Topic to open the narrow sideways column at the edge of the chart. Join Topic with Below makes one topic cell span several rows; the row names underneath stay separate. A thin band of empty canvas separates one topic from the next." },
+      { label: "Topics", body: "The tags button in the toolbar shows the narrow sideways column at the edge of the chart. Every row gets a + slot; double-click one to name a topic. Join Topic with Below, on the row right-click menu, makes one topic cell span several rows; the row names underneath stay separate. A thin band of empty canvas separates one topic from the next." },
       { label: "Rename a topic", body: "Double-click the sideways cell. It turns horizontal while you type, because a caret in rotated text is unusable." },
       { label: "Width of the names column", body: "Drag the divider at the edge of the names column - it carries a three-dot grip. The timeline columns re-divide whatever space is left and stay equal to each other. Click the grip and use the arrow keys to nudge it, Shift for larger steps." },
       { label: "A new chart", body: "Starts with twelve empty rows, so there is a sheet to fill rather than a single line." },

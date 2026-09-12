@@ -90,6 +90,8 @@ export type ViewSettings = {
   chartDirection?: ChartDirection;
   /** Master switch for the status rails. Undefined means "on". */
   showStatus?: boolean;
+  /** Whether the topic column is shown. Undefined means "off". */
+  showTopics?: boolean;
 };
 
 /** The unit a chart's integer offsets are measured in. */

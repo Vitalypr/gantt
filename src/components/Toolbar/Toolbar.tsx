@@ -26,6 +26,7 @@ import {
   AArrowDown,
   AArrowUp,
   CircleDot,
+  Tags,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -120,6 +121,8 @@ export function Toolbar() {
   const [markersDialogOpen, setMarkersDialogOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const showStatus = useStore((s) => s.showStatus);
+  const showTopics = useStore((s) => s.showTopics);
+  const setShowTopics = useStore((s) => s.setShowTopics);
   const setShowStatus = useStore((s) => s.setShowStatus);
   const [toast, setToast] = useState<ToastMessage>(null);
   const [snapshotting, setSnapshotting] = useState(false);
@@ -490,6 +493,25 @@ export function Toolbar() {
             <TooltipContent>{showQuarters ? 'Hide Quarters' : 'Show Quarters'}</TooltipContent>
           </Tooltip>
         )}
+
+        {/* Topic column. A switch rather than something derived from the data: without it the
+            column only appeared once a row already had a topic, so on a blank chart there was
+            nothing to see and nothing to click. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={showTopics ? 'default' : 'ghost'}
+              size="icon"
+              aria-label={showTopics ? 'Hide the topic column' : 'Show the topic column'}
+              aria-pressed={showTopics}
+              className="h-7 w-7"
+              onClick={() => setShowTopics(!showTopics)}
+            >
+              <Tags className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{showTopics ? 'Hide Topics' : 'Show Topics'}</TooltipContent>
+        </Tooltip>
 
         {/* Status rails — one switch for the whole chart, so a plan can be reviewed with
             delivery state on and then exported without it. */}

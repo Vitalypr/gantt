@@ -40,9 +40,11 @@ type PersistenceDeps = {
   chartDirection: ChartDirection;
   setChartDirection: (direction: ChartDirection) => void;
   showStatus: boolean;
+  showTopics: boolean;
   // Cross-slice typing is a hand-written intersection and therefore unchecked — a setter
   // missing here fails at runtime, not at compile time.
   setShowStatus: (show: boolean) => void;
+  setShowTopics: (show: boolean) => void;
 };
 
 function snapshotViewSettings(state: PersistenceDeps): ViewSettings {
@@ -55,6 +57,7 @@ function snapshotViewSettings(state: PersistenceDeps): ViewSettings {
     timelineMode: state.timelineMode,
     chartDirection: state.chartDirection,
     showStatus: state.showStatus,
+    showTopics: state.showTopics,
   };
 }
 
@@ -67,6 +70,7 @@ function applyViewSettings(state: PersistenceDeps, vs: ViewSettings) {
   if (vs.timelineMode) state.setTimelineMode(vs.timelineMode);
   if (vs.chartDirection) state.setChartDirection(vs.chartDirection);
   if (vs.showStatus !== undefined) state.setShowStatus(vs.showStatus);
+  if (vs.showTopics !== undefined) state.setShowTopics(vs.showTopics);
 }
 
 export const createPersistenceSlice: StateCreator<
