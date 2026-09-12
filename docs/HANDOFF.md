@@ -76,13 +76,15 @@ kept recurring.
   to use the bundled browser instead.
 - **`build:exe:web` rebuilds `dist/` with `--base=./`**, leaving it unusable for gh-pages.
   Re-run `pnpm build` afterwards.
-- **The pre-commit hook keeps `dist-single` correct, but not byte-reproducible.** Tailwind's
-  scan is incremental across builds in the same working tree, so the hook's rebuild can carry
-  a rule for a class the source no longer uses — `bd8ca75` shipped both `bg-current/25` and
-  `bg-current/30` where a clean build emits only the second. Nothing is ever *missing*; the
-  artifact is just larger than a fresh build by the dead rules. To check, run `pnpm
-  build:single` and see whether `git diff dist-single/index.html` is empty; commit the result
-  if it is not.
+- **Tailwind's sources are declared in `src/index.css`, not auto-detected. Leave them that
+  way.** v4's automatic detection scans the whole project minus `.gitignore`, and two paths
+  here are deliberately not ignored: `dist-single/index.html` is a tracked artifact, so each
+  build scanned the *previous* build's output and re-emitted every class it had ever held;
+  and `docs/*.md` is prose, so a handoff note that merely NAMED a utility class generated it
+  — this file did exactly that and resurrected a dead rule. The bundle became a ratchet that
+  never dropped a rule and never built twice the same. `source(none)` plus explicit `@source`
+  fixed it: the build is now idempotent and the CSS is 11 KB smaller. If the bundle starts
+  growing for no reason, check what got added to the scan.
 - **`dist-single/index.html` must stay `-text` in `.gitattributes`.** The inlined bundle holds
   raw CR bytes; `core.autocrlf` would rewrite them and the file would differ from every build.
   Its bytes also depend on the checkout: `index.html` and `public/favicon.svg` are inlined

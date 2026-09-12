@@ -1,5 +1,18 @@
 @import './fonts.css';
-@import 'tailwindcss';
+
+/*
+ * Sources are declared, not detected.
+ *
+ * Tailwind v4's automatic detection scans the whole project except what `.gitignore` hides,
+ * and two things here are deliberately NOT hidden: `dist-single/index.html` is a tracked
+ * build artifact, so each build scanned the previous build's own output and re-emitted every
+ * class it had ever contained; and `docs/*.md` is prose, so a handoff note that merely NAMED
+ * a utility class caused that class to be generated. Together they made the bundle a ratchet
+ * that never dropped a rule and never built the same way twice.
+ */
+@import 'tailwindcss' source(none);
+@source './';
+@source '../index.html';
 
 @theme {
   --color-background: #fafbfc;
