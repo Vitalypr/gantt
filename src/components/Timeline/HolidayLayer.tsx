@@ -31,10 +31,11 @@ type HolidayLayerProps = {
  * The label reads top-to-bottom because it is anchored at the top — the first letter should be
  * where the eye starts. It is deliberately allowed to overhang: a one-day holiday is a seventh
  * of a week column, about 5.7px at the default zoom, so an 8px label cannot fit inside it. The
- * text sits on its own dark backing strip. White on the band alone measures about 1.5:1 in the
- * LIGHT theme — the band is a 50%-alpha red over a near-white canvas, so it composites to a
- * pale pink — and a text-shadow was not enough at 8px. The strip fixes the contrast in both
- * themes without changing the band colour or the white the label was asked for.
+ * text is plain white with no backing. Worth knowing: on the band alone it measures 2.02:1 in
+ * the LIGHT theme — the band is a 50%-alpha red over a near-white canvas, so it composites to
+ * a pale pink — against 7.44:1 in dark. The glyph shadow below is all that lifts it there; a
+ * backing strip was tried and removed by choice, so do not treat the light-theme figure as a
+ * regression to fix by adding one back.
  *
  * Behind the bars and `pointer-events: none`, so it can never swallow a click; and it lives
  * inside `[data-gantt-grid]`, so it ships in the exported image like everything else there.
@@ -87,7 +88,7 @@ export function HolidayLayer({
           <span
             data-holiday-label
             dir="rtl"
-            className="absolute left-1/2 top-1 whitespace-nowrap rounded-sm px-[1px] py-1 text-[8px] font-semibold leading-none"
+            className="absolute left-1/2 top-1 whitespace-nowrap text-[8px] font-semibold leading-none"
             style={{
               // Flipped 180° from the default `vertical-rl`, so the glyphs face the other way.
               // `top` anchoring plus the flip is what keeps the label at the head of the band.
@@ -95,7 +96,9 @@ export function HolidayLayer({
               transform: 'translateX(-50%) rotate(180deg)',
               transformOrigin: 'center',
               color: '#ffffff',
-              backgroundColor: 'rgba(15, 23, 42, 0.6)',
+              // Not a background — an outline on the glyphs themselves, which is the only
+              // thing keeping white readable where the band composites to pale pink.
+              textShadow: '0 0 2px rgba(15,23,42,0.9), 0 1px 1px rgba(15,23,42,0.7)',
               // A long name on a short chart would otherwise run past the last row.
               maxHeight: Math.max(0, totalHeight - 8),
               overflow: 'hidden',
