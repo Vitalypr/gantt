@@ -91,7 +91,9 @@ export function dateToUnitOffset(
   mode: 'months' | 'weeks',
 ): number {
   if (mode === 'weeks') {
-    return daysBetween(new Date(startYear, startMonth - 1, 1), date) / 7;
+    // The shared anchor, not a second copy of it: an inline duplicate here is how the grid and
+    // the positions would come to disagree about where week zero starts.
+    return daysBetween(getChartWeekStart(startYear, startMonth), date) / 7;
   }
   const monthIndex = (date.getFullYear() - startYear) * 12 + date.getMonth() - (startMonth - 1);
   const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -189,9 +191,22 @@ export function getCurrentMonthIndex(startYear: number, chartStartMonth = 1): nu
 
 // --- Weeks mode utilities ---
 
-/** Get the Monday-based start of the chart's first week (first day of startMonth) */
+/**
+ * The chart's week grid starts on the SUNDAY on or before the 1st of the start month.
+ *
+ * Buckets used to be anchored to the 1st itself, whatever weekday that was, so a chart
+ * starting on a Thursday had every "week" run Thursday to Wednesday. The columns were then
+ * labelled with ISO week numbers, which made them look like calendar weeks while spanning a
+ * different seven days — and a holiday that really does straddle a week, like Rosh Hashanah
+ * falling on a Saturday and Sunday, sat inside one column instead of crossing two.
+ *
+ * Sunday because this chart is read against the Israeli week. Every weeks-mode utility routes
+ * through here, so the grid, the headers, the boundaries and `dateToUnitOffset` cannot drift
+ * apart on the question of where a week begins.
+ */
 function getChartWeekStart(startYear: number, startMonth: number): Date {
-  return new Date(startYear, startMonth - 1, 1);
+  const first = new Date(startYear, startMonth - 1, 1);
+  return addDays(first, -first.getDay());
 }
 
 /** Get the end of the chart's last week (last day of endMonth) */

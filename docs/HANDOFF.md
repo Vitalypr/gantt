@@ -43,6 +43,14 @@ kept recurring.
   is what makes "text never reaches the rail" structural rather than a sum that happens to work
   at the default font size. `src/test/activity-status.test.ts` asserts both, including the case
   that fails without the reserve.
+- **Week columns start on SUNDAY**, anchored to the Sunday on or before the 1st of the chart's
+  start month — not to the 1st itself. `getChartWeekStart` is the only place that decides this
+  and every weeks-mode utility, including `dateToUnitOffset`, routes through it. Anchoring to
+  the 1st meant a chart beginning on a Thursday had every column run Thursday to Wednesday
+  while the header labelled it with an ISO week number, so a holiday that really straddles a
+  week — Rosh Hashanah on a Saturday and Sunday — sat inside one column. Changing the anchor
+  moves every weeks-mode bar's real date by up to six days; the bucket index is unchanged, so
+  existing charts keep their shape and shift in the calendar.
 - **`utils/layout.ts` owns the width arithmetic the sidebar drag and fit-to-view share.**
   `fitUnitWidth` divides the space beside the sidebar by the unit count; `sidebarWidthFromDrag`
   turns a pointer delta into a width. Both are RTL-aware by construction and unit-tested —
