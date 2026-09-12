@@ -1,37 +1,33 @@
 import { useState } from 'react';
-import { Diamond, MessageSquareText, Palette, Pencil, Trash2 } from 'lucide-react';
 import type { Activity, AnchorSide } from '@/types/gantt';
 import { ANCHOR_SIDES } from '@/types/gantt';
-import { EDGE_THRESHOLD } from '@/constants/timeline';
+import { BAR_OUTLINE_WIDTH, EDGE_THRESHOLD, ROW_SPAN_EDGE_THRESHOLD } from '@/constants/timeline';
 import { useStore } from '@/stores';
+import { unitSpanToLeft } from '@/utils/timeline';
+import { useChartDirection } from '@/hooks/useChartDirection';
 import { cn } from '@/lib/utils';
 import { isColorDark } from '@/utils/color';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
-import { useInlineEdit } from '@/hooks/useInlineEdit';
-import { ColorPicker } from './ColorPicker';
 import { AnnotationPopover } from './AnnotationPopover';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-  ContextMenuSub,
-  ContextMenuSubTrigger,
-  ContextMenuSubContent,
-} from '@/components/ui/context-menu';
+import { ActivityNameInput } from './ActivityNameInput';
+import { ActivityContextMenu } from './ActivityContextMenu';
+import { effectiveFontSize } from '@/utils/activity';
 
 type ActivityBarProps = {
   activity: Activity;
   monthWidth: number;
+  totalUnits: number;
   isSelected: boolean;
   isEditing: boolean;
   moveOverride: { currentStartMonth: number } | null;
+  /** Vertical preview offset in px while the bar is being dragged across rows. */
+  dragOffsetY?: number;
   resizeOverride: { currentStartMonth: number; currentDuration: number } | null;
   rowSpan: number;
   rowSpanOverride: number | null;
   topOffsetOverride: number | null;
-  onSelect: () => void;
+  /** `additive` is true for Ctrl/Cmd/Shift-click: extend the selection instead of replacing it. */
+  onSelect: (additive: boolean) => void;
   onDoubleClick: () => void;
   onDragMoveStart: (e: React.PointerEvent) => void;
   onDragResizeStart: (e: React.PointerEvent, edge: 'left' | 'right') => void;
@@ -42,9 +38,11 @@ type ActivityBarProps = {
 export function ActivityBar({
   activity,
   monthWidth,
+  totalUnits,
   isSelected,
   isEditing,
   moveOverride,
+  dragOffsetY = 0,
   resizeOverride,
   rowSpan,
   rowSpanOverride,
@@ -56,41 +54,27 @@ export function ActivityBar({
   onDragRowSpanStart,
   onAnchorPointerDown,
 }: ActivityBarProps) {
-  const updateActivity = useStore((s) => s.updateActivity);
-  const removeActivity = useStore((s) => s.removeActivity);
-  const selectActivity = useStore((s) => s.selectActivity);
   const setEditingActivity = useStore((s) => s.setEditingActivity);
   const timelineMode = useStore((s) => s.timelineMode);
 
-  const { inputRef, editValue, setEditValue, commitEdit, handleEditKeyDown } = useInlineEdit(activity.id, activity.name, isEditing);
   const checkDoubleTap = useDoubleTap();
 
   const [annotationOpen, setAnnotationOpen] = useState(false);
-  const hasAnnotation = !!activity.annotation;
 
   const startMonth = moveOverride?.currentStartMonth ?? resizeOverride?.currentStartMonth ?? activity.startMonth;
   const duration = resizeOverride?.currentDuration ?? activity.durationMonths;
 
-  const left = startMonth * monthWidth;
-  const width = duration * monthWidth;
-
-  const handleDelete = () => {
-    removeActivity(activity.id);
-    selectActivity(null);
-  };
-
-  const handleColorChange = (color: string) => {
-    updateActivity(activity.id, { color });
-  };
-
-  const handleToggleMilestone = () => {
-    updateActivity(activity.id, {
-      isMilestone: true,
-      durationMonths: 1,
-    });
-  };
+  const { isRtl } = useChartDirection();
+  const width = Math.max(duration * monthWidth, monthWidth * 0.5);
+  // Single choke point for index -> pixel. In RTL the axis is mirrored arithmetically;
+  // `direction: rtl` cannot express it and would invert the scroll origin.
+  const left = unitSpanToLeft(startMonth, width / monthWidth, monthWidth, totalUnits, isRtl);
 
   const isDark = isColorDark(activity.color);
+  const labelColor = isDark ? '#ffffff' : '#0f172a';
+  const fontSize = effectiveFontSize(activity);
+  // Undefined means "follow the theme": a frozen literal would not re-theme in dark mode.
+  const frameColor = activity.outlineColor ?? 'var(--color-bar-outline)';
   const effectiveRowSpan = rowSpanOverride ?? rowSpan;
   const isSpanning = effectiveRowSpan > 1;
   const heightStyle = `calc(${effectiveRowSpan * 100}% - 8px)`;
@@ -98,10 +82,14 @@ export function ActivityBar({
   const topStyle = topOffset > 0 ? `calc(4px - ${topOffset * 100}%)` : '4px';
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
+    <ActivityContextMenu
+      activity={activity}
+      onRename={() => setEditingActivity({ activityId: activity.id })}
+      onAnnotate={() => setAnnotationOpen(true)}
+    >
         <div
           data-activity-bar
+        data-activity-id={activity.id}
           className={cn(
             'activity-bar group absolute flex cursor-grab items-center rounded-md',
             isSelected && 'activity-bar--selected ring-2 ring-ring ring-offset-1',
@@ -109,13 +97,21 @@ export function ActivityBar({
           style={{
             left,
             top: topStyle,
-            width: Math.max(width, monthWidth * 0.5),
+            width,
             height: heightStyle,
             backgroundColor: activity.color,
+            // Negative offset draws the frame inside the box, so it changes neither layout
+            // nor the rect dependency arrows attach to.
+            outline: `${BAR_OUTLINE_WIDTH}px solid ${frameColor}`,
+            outlineOffset: -BAR_OUTLINE_WIDTH,
+            // Rows are separate absolutely-positioned containers with overflow visible, so a
+            // translate is what carries the bar across them; z-index lifts it over the rest.
+            transform: dragOffsetY ? `translateY(${dragOffsetY}px)` : undefined,
+            zIndex: dragOffsetY ? 30 : undefined,
           }}
           onClick={(e) => {
             e.stopPropagation();
-            onSelect();
+            onSelect(e.ctrlKey || e.metaKey || e.shiftKey);
           }}
           onDoubleClick={(e) => {
             e.stopPropagation();
@@ -135,12 +131,12 @@ export function ActivityBar({
             const relX = e.clientX - rect.left;
             const relY = e.clientY - rect.top;
             // Top edge triggers row span drag (upward)
-            if (relY < EDGE_THRESHOLD) {
+            if (relY < ROW_SPAN_EDGE_THRESHOLD) {
               onDragRowSpanStart(e, 'top');
               return;
             }
             // Bottom edge triggers row span drag (downward)
-            if (relY > rect.height - EDGE_THRESHOLD) {
+            if (relY > rect.height - ROW_SPAN_EDGE_THRESHOLD) {
               onDragRowSpanStart(e, 'bottom');
               return;
             }
@@ -163,7 +159,7 @@ export function ActivityBar({
             isEditing={isEditing}
             isOpen={annotationOpen}
             onOpenChange={setAnnotationOpen}
-            iconColorStyle={{ color: isDark ? '#ffffff' : '#0f172a' }}
+            iconColorStyle={{ color: labelColor }}
           />
 
           {/* Left resize handle */}
@@ -172,25 +168,21 @@ export function ActivityBar({
           {/* Name label or edit input */}
           <div className="flex-1 overflow-hidden px-2">
             {isEditing ? (
-              <input
-                ref={inputRef}
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onBlur={commitEdit}
-                onKeyDown={handleEditKeyDown}
-                className="w-full bg-transparent text-center text-xs font-medium outline-none"
-                style={{ color: isDark ? '#ffffff' : '#0f172a' }}
+              <ActivityNameInput
+                activityId={activity.id}
+                name={activity.name}
+                color={labelColor}
+                fontSize={fontSize}
               />
             ) : (
               <span
+                data-activity-label
+                dir="auto"
                 className={cn(
-                  'block text-center text-[10px] font-medium leading-tight',
+                  'block text-center font-medium leading-tight',
                   effectiveRowSpan >= 3 ? '' : isSpanning ? 'line-clamp-4' : 'line-clamp-2',
                 )}
-                style={{
-                  color: isDark ? '#ffffff' : '#0f172a',
-                  wordBreak: 'break-word',
-                }}
+                style={{ color: labelColor, fontSize, wordBreak: 'break-word' }}
               >
                 {activity.name}
               </span>
@@ -201,7 +193,7 @@ export function ActivityBar({
           {!isEditing && duration > 1 && (
             <span
               className="absolute bottom-0.5 right-1 text-[9px] font-medium leading-none opacity-60"
-              style={{ color: isDark ? '#ffffff' : '#0f172a' }}
+              style={{ color: labelColor }}
             >
               {duration}{timelineMode === 'weeks' ? 'w' : 'm'}
             </span>
@@ -256,39 +248,6 @@ export function ActivityBar({
             </>
           )}
         </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem
-          onClick={() => setEditingActivity({ activityId: activity.id })}
-        >
-          <Pencil className="mr-2 h-3.5 w-3.5" />
-          Rename
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => setAnnotationOpen(true)}>
-          <MessageSquareText className="mr-2 h-3.5 w-3.5" />
-          {hasAnnotation ? 'Edit Annotation' : 'Add Annotation'}
-        </ContextMenuItem>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>
-            <Palette className="mr-2 h-3.5 w-3.5" />
-            Color
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent className="p-2">
-            <ColorPicker currentColor={activity.color} onColorChange={handleColorChange} />
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSeparator />
-        <ContextMenuItem onClick={handleToggleMilestone}>
-          <Diamond className="mr-2 h-3.5 w-3.5" />
-          Convert to Milestone
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem className="text-destructive" onClick={handleDelete}>
-          <Trash2 className="mr-2 h-3.5 w-3.5" />
-          Delete
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    </ActivityContextMenu>
   );
 }
-

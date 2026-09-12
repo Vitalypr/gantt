@@ -41,9 +41,57 @@ export const ACTIVITY_COLOR_GROUPS = [
     colors: ['#cffafe', '#67e8f9', '#06b6d4', '#0e7490'],
   },
   {
+    name: 'Sky',
+    colors: ['#e0f2fe', '#7dd3fc', '#0ea5e9', '#0369a1'],
+  },
+  {
+    name: 'Emerald',
+    colors: ['#d1fae5', '#6ee7b7', '#10b981', '#047857'],
+  },
+  {
+    name: 'Lime',
+    colors: ['#ecfccb', '#bef264', '#84cc16', '#4d7c0f'],
+  },
+  {
+    name: 'Yellow',
+    colors: ['#fef9c3', '#fde047', '#eab308', '#a16207'],
+  },
+  {
+    name: 'Purple',
+    colors: ['#f3e8ff', '#d8b4fe', '#a855f7', '#7e22ce'],
+  },
+  {
+    name: 'Fuchsia',
+    colors: ['#fae8ff', '#f0abfc', '#d946ef', '#a21caf'],
+  },
+  {
+    name: 'Rose',
+    colors: ['#ffe4e6', '#fda4af', '#f43f5e', '#be123c'],
+  },
+  {
+    name: 'Slate',
+    colors: ['#f1f5f9', '#cbd5e1', '#64748b', '#334155'],
+  },
+  {
+    name: 'Stone',
+    colors: ['#f5f5f4', '#d6d3d1', '#78716c', '#44403c'],
+  },
+  {
     name: 'Gray',
     colors: ['#f3f4f6', '#d1d5db', '#6b7280', '#374151'],
   },
 ] as const;
 
-export const DEFAULT_ACTIVITY_COLOR = '#3b82f6';
+/** Every swatch, flattened — used by the frame-colour picker and by tests. */
+export const ALL_ACTIVITY_COLORS: readonly string[] = ACTIVITY_COLOR_GROUPS.flatMap(
+  (g) => g.colors,
+);
+
+/**
+ * Teal, not blue.
+ *
+ * The chrome accent is indigo-500 (`--color-primary`), and a blue-500 default put content a
+ * near-miss away from it in every screenshot. Teal is unambiguously a different hue while
+ * still reading as content rather than UI.
+ */
+export const DEFAULT_ACTIVITY_COLOR = '#14b8a6';

@@ -1,5 +1,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { useStore } from '@/stores';
+import { clampStartUnit, deltaToUnits, visualEdgeToTemporalEdge } from '@/utils/timeline';
+import { totalUnits as totalUnitsOf } from '@/stores/selectors';
+import { useLatest } from '@/hooks/useLatest';
 
 const DRAG_THRESHOLD = 4;
 
@@ -19,8 +22,7 @@ export function useDragResize() {
   const startXRef = useRef(0);
   const isDraggingRef = useRef(false);
   const dragStateRef = useRef<DragResizeState>(null);
-  const monthWidthRef = useRef(monthWidth);
-  monthWidthRef.current = monthWidth;
+  const monthWidthRef = useLatest(monthWidth);
 
   const updateDragState = (next: DragResizeState) => {
     dragStateRef.current = next;
@@ -61,23 +63,28 @@ export function useDragResize() {
           });
         }
 
-        const deltaMonths = Math.round(deltaX / monthWidthRef.current);
+        const st = useStore.getState();
+        const isRtl = st.chartDirection === 'rtl';
+        const total = totalUnitsOf(st);
+        const deltaMonths = deltaToUnits(deltaX, monthWidthRef.current, isRtl);
 
-        if (edge === 'left') {
-          const newStart = startMonth + deltaMonths;
+        // The edge the pointer touched is not necessarily the edge it controls: in RTL the
+        // visually-left edge is the temporal END.
+        const temporal = visualEdgeToTemporalEdge(edge, isRtl);
+        const prev = dragStateRef.current;
+        if (!prev) return;
+
+        if (temporal === 'start') {
           const newDuration = durationMonths - deltaMonths;
-          if (newDuration >= 1 && newStart >= 0) {
-            const prev = dragStateRef.current;
-            if (prev) {
-              updateDragState({ ...prev, currentStartMonth: newStart, currentDuration: newDuration });
-            }
+          const newStart = clampStartUnit(startMonth + deltaMonths, newDuration, total);
+          if (newDuration >= 1) {
+            updateDragState({ ...prev, currentStartMonth: newStart, currentDuration: newDuration });
           }
         } else {
-          const newDuration = Math.max(1, durationMonths + deltaMonths);
-          const prev = dragStateRef.current;
-          if (prev) {
-            updateDragState({ ...prev, currentDuration: newDuration });
-          }
+          // Clamp the far end too, or the bar leaves the sized grid track and the scroll
+          // container cannot reach it.
+          const newDuration = Math.max(1, Math.min(durationMonths + deltaMonths, total - startMonth));
+          updateDragState({ ...prev, currentDuration: newDuration });
         }
       };
 

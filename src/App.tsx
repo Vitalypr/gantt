@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Toolbar } from '@/components/Toolbar/Toolbar';
+import { FindPanel } from '@/components/Toolbar/FindPanel';
 import { GanttChart } from '@/components/GanttChart/GanttChart';
 import { EasterEgg } from '@/components/EasterEgg';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
@@ -40,22 +41,21 @@ export function App() {
   useAutoSave();
   const { show: showEasterEgg, handleDone: handleEasterEggDone } = useEasterEgg();
 
-  // Restore view settings from auto-saved chart on initial mount
+  // Restore view settings from the auto-saved chart on first mount, through the canonical
+  // helper. Restoring a hand-picked subset here is what dropped timelineMode, weekWidth and
+  // the chart direction on every reload.
   useEffect(() => {
-    const { chart, setMonthWidth, setSidebarWidth, setRowSize, setShowQuarters } = useStore.getState();
-    if (chart.viewSettings) {
-      setMonthWidth(chart.viewSettings.monthWidth);
-      setSidebarWidth(chart.viewSettings.sidebarWidth);
-      setRowSize(chart.viewSettings.rowSize);
-      setShowQuarters(chart.viewSettings.showQuarters);
-    }
+    const { chart, weeksChart, restoreViewSettings } = useStore.getState();
+    const vs = chart.viewSettings ?? weeksChart.viewSettings;
+    if (vs) restoreViewSettings(vs);
   }, []);
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       <Toolbar />
-      <div className="flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-hidden">
         <GanttChart />
+        <FindPanel />
       </div>
       {showEasterEgg && <EasterEgg onDone={handleEasterEggDone} />}
     </div>

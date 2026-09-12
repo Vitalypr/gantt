@@ -25,6 +25,13 @@ export function EasterEgg({ onDone }: { onDone: () => void }) {
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
     };
+    // Seed the DOM directly. Position is owned by the rAF loop below, never by render —
+    // reading posRef during render is unsafe under concurrent rendering and would be
+    // overwritten a frame later anyway.
+    if (imgRef.current) {
+      imgRef.current.style.left = `${posRef.current.x}px`;
+      imgRef.current.style.top = `${posRef.current.y}px`;
+    }
   }, []);
 
   // Animation loop using requestAnimationFrame for smooth bouncing
@@ -92,8 +99,6 @@ export function EasterEgg({ onDone }: { onDone: () => void }) {
       alt=""
       style={{
         position: 'fixed',
-        left: posRef.current.x,
-        top: posRef.current.y,
         width: IMG_SIZE,
         zIndex: 9999,
         pointerEvents: 'none',

@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# Keeps dist-single/index.html in step with the source it was built from.
+#
+# The single-file HTML is a tracked deliverable, so a commit that changes the app without
+# rebuilding it would publish a stale artifact. This rebuilds and stages it in the same
+# commit. The build is deterministic, so a commit that does not change the bundle produces
+# no diff here either.
+#
+# Wired up by the `prepare` script in package.json (core.hooksPath=.githooks).
+# Bypass for a one-off with `git commit --no-verify`.
+set -e
+
+# Only rebuild when something that can reach the bundle is staged.
+if ! git diff --cached --name-only | grep -qE '^(src/|public/|index\.html$|package\.json$|pnpm-lock\.yaml$|vite\.singlefile\.config\.ts$)'; then
+  exit 0
+fi
+
+echo "pre-commit: source changed, rebuilding dist-single/index.html"
+pnpm run build:single >/dev/null
+
+git add dist-single/index.html
+
+if git diff --cached --quiet -- dist-single/index.html; then
+  echo "pre-commit: dist-single/index.html unchanged"
+else
+  echo "pre-commit: dist-single/index.html rebuilt and staged"
+fi

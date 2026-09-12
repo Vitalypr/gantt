@@ -1,227 +1,120 @@
-# Gantt Chart Project
+# Gantt Chart
 
-Interactive Gantt chart application for project planning and task management.
+> **⚠️ Work in progress — read the handoff before doing anything else.**
+> It carries the current status, the agreed order of remaining work, and the gotchas that
+> cost real time to rediscover. Imported (not just linked) so it survives `/compact`.
+> Delete this block and the file when the work lands.
+>
+> **Rule — update `docs/HANDOFF.md` as part of finishing each major feature or fix, in the
+> same change, not afterwards.** Move the item out of "Outstanding work"; delete status that
+> is no longer true rather than appending to it; add any gotcha that cost more than a few
+> minutes to find. The handoff must read as the current state, never as a changelog — if it
+> is growing monotonically, it is being written wrong.
+>
+> @docs/HANDOFF.md
 
-## Tech Stack
+Offline-first React SPA for **drawing** program-plan charts. No backend, no router, no
+scheduling engine. Dependency arrows are decorative geometry, not constraints — nothing
+recalculates when a bar moves. The deliverable is an exported image or a JSON file.
 
-- **Framework**: React 19 + TypeScript 5.9 + Vite 7
-- **State Management**: Zustand 5 (immer middleware + zundo undo/redo)
-- **UI**: shadcn/ui + Radix primitives + Tailwind CSS 4
-- **Icons**: lucide-react
-- **IDs**: nanoid
-- **Testing**: Vitest + React Testing Library
-- **Linting**: ESLint 9 + typescript-eslint
-- **Packaging**: @yao-pkg/pkg (standalone Windows EXE)
+Keep that character in mind before adding features: auto-scheduling, critical path, typed
+FS/SS/FF/SF dependencies, resources and baselines are all **deliberately out of scope**
+(rationale in `docs/improvement-roadmap.md`).
 
 ## Commands
 
-```bash
-pnpm dev          # Start dev server
-pnpm build        # Production build (tsc + vite)
-pnpm build:exe    # Build + package as standalone Windows EXE
-pnpm test         # Run tests
-pnpm test:watch   # Watch mode
-pnpm lint         # ESLint
-pnpm preview      # Preview production build
-```
+Package manager is **pnpm**.
 
----
+| Command | What it does |
+|---|---|
+| `pnpm dev` | Vite dev server |
+| `pnpm build` | `tsc -b && vite build` → `dist/` |
+| `pnpm lint` | ESLint (currently **fails** — see roadmap R-LINT) |
+| `pnpm test` / `pnpm test:watch` | Vitest |
+| `pnpm build:single` | One self-contained HTML file → `dist-single/` (**tracked** — see below) |
+| `pnpm build:exe` | Standalone Windows EXE → `dist-exe/` |
+| `pnpm deploy:gh` | Build + publish `dist/` to gh-pages |
 
-## Architecture
+If any script dies with `Cannot find module .../node_modules/<tool>`, the pnpm junctions
+are stale (the repo has been moved). Fix: `CI=true pnpm install`.
 
-### Store (Zustand)
+## Non-obvious invariants
 
-Sliced architecture with middleware stack: `temporal(immer(...))`.
+These cause real bugs when violated and cannot be inferred from a quick read.
 
-**`src/stores/index.ts`** — Composes 3 slices into `StoreState`:
-- `ChartSlice` — chart data (rows, activities, dependencies)
-- `UiSlice` — UI state (zoom, selection, editing, dependency mode)
-- `PersistenceSlice` — save/load/export/import
+- **Two charts live in one store.** `chart` (months) and `weeksChart` (weeks) coexist.
+  Every `chartSlice` mutator routes through the private `withActive(state)` helper keyed on
+  `uiSlice.timelineMode`. `GanttChart` and `WeeksChart` are *structurally identical* types,
+  so TypeScript cannot catch cross-mode misrouting — check the mode by hand.
+- **`Activity.startMonth` is an integer unit offset from chart start, not a date.** In weeks
+  mode the same field holds a *week* index. `durationMonths` likewise counts units.
+- **Changing the chart date range rebases every activity** so bars keep their calendar
+  position (`setDateRange` in `chartSlice.ts`). Adding a positional field means teaching
+  that rebase about it.
+- **One user gesture must be one store commit**, or it costs two Ctrl+Z presses. zundo
+  records a history entry per `set()` that changes the chart reference, and every mutator
+  bumps `updatedAt`.
+- **UI state is outside undo history.** `partialize` keeps only `{chart, weeksChart}`, which
+  is why `selectedActivity` / `editingActivity` can dangle at a deleted id after an undo.
+- **`dist-single/index.html` is a tracked build artifact, not a throwaway.** It is the
+  distributable, so it must never lag `src/`. `.githooks/pre-commit` rebuilds and stages it
+  whenever a commit touches `src/`, `public/`, `index.html`, `package.json` or the
+  single-file vite config; `package.json`'s `prepare` script points `core.hooksPath` at
+  `.githooks` on install. The build is deterministic, so an unchanged bundle produces no
+  diff. `.gitattributes` marks the file `-text` — the inlined bundle contains raw CR bytes
+  and `core.autocrlf=true` would otherwise rewrite them on checkout. Everything else in
+  `dist-single/` is a copy of `public/` and stays ignored, which means a clone has the HTML
+  but not `easter_egg.jpg`.
 
-Undo/redo via zundo `temporal` middleware, partializes only `chart` state (50 history limit).
+- **RTL is arithmetic, not CSS.** `utils/timeline.ts` owns every index→pixel conversion
+  (`unitSpanToLeft`, `xToUnit`, `deltaToUnits`, `dateToUnitOffset`). `direction: rtl` is
+  deliberately NOT used on the grid — it does not move physical `left` and it inverts the
+  scroll origin. Dependencies persist TEMPORAL sides and resolve to physical ones at render
+  through `resolveAnchorSide`.
+- **`Chart` is a discriminated union** on `unit: 'month' | 'week'`. Narrow on it; do not
+  re-type the mode branch. Read the active chart via `activeChart()` in `stores/selectors.ts`.
+- **View settings have one parser** (`utils/viewSettings.ts`) with a compile-time key list.
+  Adding a field means type + key list + parser, and a test enforces the round trip.
+- **`GanttRow.mergedWithNext` is purely cosmetic** — it merges sidebar name cells. There is
+  no logical grouping in the data model.
 
-**`src/stores/hooks.ts`** — `useTemporalStore()`, `useUndo()`, `useRedo()`.
+## DOM contracts
 
-### Key Data Model (`src/types/gantt.ts`)
+Code measures the live DOM instead of threading geometry through props. Keep these
+attributes and their meaning intact:
 
-- **`Activity.startMonth`** — offset from chart start (month index 0-based). When chart start date changes, all activities are shifted to preserve calendar position.
-- **`Activity.isMilestone`** — renders as diamond instead of bar
-- **`Activity.rowSpan`** — number of rows to span (1 = default, unlimited upward/downward)
-- **`Activity.annotation`** — optional text note, shown via message icon on the bar
-- **`GanttRow.mergedWithNext`** — visual cell merge in sidebar
-- **`Dependency`** — connects two activities via `fromSide`/`toSide` anchors (left/right/top/bottom)
-- **`GanttChart`** — root object with date range, rows, activities, dependencies
+| Selector | Meaning |
+|---|---|
+| `[data-gantt-scroll]` | The single scroll container; `scrollLeft`/`scrollTop` source |
+| `[data-gantt-grid]` | Snapshot capture root — **anything inside it ships in the exported image** |
+| `[data-timeline-body]` | Origin for every pointer→chart coordinate conversion |
+| `[data-activity-bar]` | Marks a bar/milestone; hit-tests use `closest()` on it |
+| `[data-sidebar-row]` | Sidebar row cell |
 
-### Component Hierarchy
+## Conventions that differ from defaults
 
-```
-App
-├── Toolbar (chart name, date range, zoom, connect mode, undo/redo, file ops, help)
-└── GanttChart
-    ├── Sidebar (row names, merge groups, resize handle)
-    ├── TimelineHeader (year / quarter / month tiers)
-    ├── TimelineGrid (background lines)
-    ├── TodayMarker (red dashed line)
-    ├── TimelineBody
-    │   ├── ActivityBar (drag, resize, rowSpan, context menu, color, inline rename)
-    │   └── MilestoneMarker (diamond, drag, context menu)
-    └── DependencyLayer (SVG orthogonal arrows)
-```
+- Named exports only. No default exports anywhere.
+- `type` over `interface`; `as const` unions over `enum`; `unknown` over `any`.
+- `strict` + `noUncheckedIndexedAccess` are on — indexed access yields `T | undefined`.
+  The codebase uses `!` after bounds-checked lookups; keep that style rather than adding
+  optional chaining that hides a real invariant.
+- Design tokens live in the `@theme` block of `src/index.css` with a matching `.dark`
+  override. Do not hardcode a hex in a component.
+- `@/` is the alias for `src/`.
 
-### Drag Hooks (`src/hooks/`)
+## Where the detail lives
 
-| Hook | Purpose |
-|------|---------|
-| `useDragCreate` | Drag on empty timeline to create activity (double-click = 1-month) |
-| `useDragMove` | Drag activity bar horizontally (snaps to month grid) |
-| `useDragResize` | Drag left/right edge to resize duration |
-| `useDragRowSpan` | Drag top/bottom edge to span multiple rows |
-| `useDragConnect` | Drag from anchor dot to create dependency |
-| `useResizeSidebar` | Drag sidebar right edge to resize |
+Path-scoped rules under `.claude/rules/` load automatically when you open the matching
+files — `stores.md`, `timeline-math.md`, `drag-hooks.md`, `ui-components.md`.
 
-### Other Hooks
+Human-facing reference (read on demand, not auto-loaded):
 
-| Hook | Purpose |
-|------|---------|
-| `useKeyboardShortcuts` | Ctrl+Z, Ctrl+Shift+Z, Delete, Escape |
-| `useAutoSave` | Debounced auto-save to localStorage |
+- `docs/architecture.md` — how the layers fit together, render and event flow
+- `docs/data-model.md` — persisted schema, storage keys, migration
+- `docs/build-and-distribution.md` — the four build modes and their base-path traps
+- `docs/improvement-roadmap.md` — prioritised backlog and the known-defect register
 
----
-
-## Project Structure
-
-```
-src/
-├── components/
-│   ├── Activity/           # ActivityBar, MilestoneMarker, ColorPicker
-│   ├── DependencyArrows/   # DependencyLayer (SVG)
-│   ├── Dialogs/            # AddRowDialog, SaveDialog, HelpDialog, DisciplineDialog
-│   ├── GanttChart/         # GanttChart (main container)
-│   ├── Sidebar/            # Sidebar (row names)
-│   ├── Timeline/           # TimelineBody, TimelineHeader, TimelineGrid, TodayMarker
-│   ├── Toolbar/            # Toolbar (top bar)
-│   └── ui/                 # shadcn/ui: button, context-menu, dialog, input, tooltip
-├── constants/
-│   ├── timeline.ts         # ROW_SIZE_MAP, zoom limits, month names
-│   └── colors.ts           # 11 color families x 4 shades, DEFAULT_ACTIVITY_COLOR
-├── hooks/                  # Drag hooks, keyboard shortcuts, auto-save, sidebar resize
-├── lib/
-│   └── utils.ts            # cn() — clsx + tailwind-merge
-├── stores/
-│   ├── index.ts            # Store composition (immer + temporal)
-│   ├── hooks.ts            # useUndo, useRedo
-│   └── slices/
-│       ├── chartSlice.ts   # Rows, activities, dependencies CRUD
-│       ├── uiSlice.ts      # Zoom, selection, editing, dependency mode
-│       └── persistenceSlice.ts  # Save/load/export/import
-├── types/
-│   └── gantt.ts            # Activity, GanttRow, GanttChart, Dependency, AnchorSide
-├── utils/
-│   ├── timeline.ts         # Month/year/quarter header builders, getCurrentMonthIndex
-│   ├── dependencyRouting.ts # Orthogonal arrow routing, anchor points, SVG path gen
-│   └── persistence.ts      # localStorage CRUD, JSON export/import, chart migration
-├── App.tsx                 # Root component
-├── main.tsx                # React entry point
-└── index.css               # Tailwind imports, custom theme, anchor dot styles
-
-launcher/
-└── server.cjs              # Standalone HTTP server for EXE distribution
-```
-
----
-
-## Key Constants (`src/constants/timeline.ts`)
-
-| Constant | Value | Usage |
-|----------|-------|-------|
-| `ROW_SIZE_MAP` | small=28, medium=40, large=56 | Configurable row heights |
-| `DEFAULT_MONTH_WIDTH` | 80px | Initial zoom level |
-| `MIN_MONTH_WIDTH` | 20px | Min zoom |
-| `MAX_MONTH_WIDTH` | 180px | Max zoom |
-| `ZOOM_STEP` | 10px | Zoom increment |
-| `DEFAULT_SIDEBAR_WIDTH` | 240px | Initial sidebar width |
-
----
-
-## Features
-
-1. **Rows** — Add, rename, delete, reorder, merge name cells
-2. **Activities** — Create by drag/double-click, move, resize, multi-row span (top/bottom), color, inline rename, annotations
-3. **Milestones** — Diamond markers (scale with row height), convert to/from activity via context menu
-4. **Dependencies** — Toggle connect mode, drag anchor-to-anchor, orthogonal SVG arrows, right-click delete
-5. **Timeline** — Year/quarter/month headers, zoom, fit-to-view, today marker, date range picker, row height cycling (S/M/L)
-6. **Undo/Redo** — 50-step history (Ctrl+Z / Ctrl+Shift+Z)
-7. **Persistence** — Auto-save, manual save, load, export/import JSON (includes ViewSettings)
-8. **Keyboard** — Ctrl+Z, Ctrl+Y, Delete, Escape, Enter
-9. **Touch/Mobile** — Pointer events for all drags, double-tap support, PWA fullscreen
-10. **Display** — Row height cycling (small/medium/large), quarter toggle, fit-to-view zoom
-
----
-
-## Portable EXE Distribution
-
-`pnpm build:exe` produces a single `dist-exe/GanttChart.exe` (~65MB) that bundles:
-- Node.js runtime (via `@yao-pkg/pkg`)
-- Built web app (embedded in the EXE)
-- Minimal HTTP server (`launcher/server.cjs`)
-
-Double-click the EXE to launch — it starts a local server and opens the app in the default browser. No Node.js or other dependencies needed on the target PC.
-
-**Note:** The EXE is unsigned. Windows SmartScreen will prompt "More info" → "Run anyway" on first launch.
-
----
-
-## Patterns & Conventions
-
-- **Activities identified by** `data-activity-bar` attribute
-- **Timeline body container**: use `[data-timeline-body]` selector
-- **Anchor dots**: CSS classes in index.css, positioned via `data-side` attribute
-- **Selection mutual exclusion**: `selectedActivity` and `selectedDependency` clear each other
-- **Persistence migration**: `migrateChart()` converts old discipline format to flat rows
-- **No routing library** — single-page app, dialogs are modals
-
----
-
-## TypeScript Best Practices
-
-- `strict: true` + `noUncheckedIndexedAccess: true`
-- Prefer `type` over `interface`
-- Use `as const` + union types instead of `enum`
-- Prefer `unknown` over `any`
-- Named exports only (no default exports)
-- Co-locate component prop types in same file
-
-## React Best Practices
-
-- Functional components only
-- One component per file (PascalCase)
-- Extract complex logic into hooks
-- Use `cn()` for conditional Tailwind classes
-- Composition over configuration
-- Local state for UI, Zustand for shared state
-
-## File Naming
-
-| Item | Convention | Example |
-|------|-----------|---------|
-| Components | PascalCase | `GanttChart.tsx` |
-| Hooks | camelCase with `use` | `useDragMove.ts` |
-| Utilities | camelCase | `dependencyRouting.ts` |
-| Types | PascalCase | `Activity`, `GanttChart` |
-| Constants | UPPER_SNAKE_CASE | `ROW_HEIGHT` |
-| Store slices | camelCase + `Slice` | `chartSlice.ts` |
-| Tests | co-located `.test.ts(x)` | `GanttChart.test.tsx` |
-
-## Git Conventions
-
-- **Commits**: Conventional Commits (`feat:`, `fix:`, `refactor:`, `chore:`)
-- **Branches**: `feat/gantt-zoom`, `fix/task-resize-bug`
-
-## Code Quality
-
-1. No dead code — delete unused variables, imports, functions
-2. No magic numbers — use named constants
-3. No string literals for state — use union types
-4. Single responsibility per function/component
-5. Early returns to reduce nesting
-6. Immutable state updates (immer)
+<!-- Maintainer note: keep this file under ~120 lines. Content Claude can derive by reading
+the code (directory trees, constant tables, dependency lists) belongs in docs/, not here.
+@imports do NOT reduce context — they expand at launch. Only .claude/rules/ with `paths:`
+frontmatter and per-directory CLAUDE.md files load lazily. -->

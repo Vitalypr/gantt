@@ -3,6 +3,7 @@ import { useStore } from '@/stores';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { getMonthBoundaryWeeks, getYearBoundaryWeeks } from '@/utils/timeline';
 import type { TimelineMode } from '@/types/gantt';
+import { useChartDirection } from '@/hooks/useChartDirection';
 
 type Row = {
   rowId: string;
@@ -21,6 +22,13 @@ type TimelineGridProps = {
   timelineMode: TimelineMode;
 };
 
+/**
+ * Four grid tiers, differentiated by colour AND stroke width.
+ *
+ * Two tiers drawn in the same colour are one tier: the stroke-colour ternary used to return
+ * the same token for both the year and month branches, leaving stroke width as the only
+ * difference and collapsing four intended tiers into two.
+ */
 export function TimelineGrid({
   totalUnits,
   unitWidth,
@@ -32,6 +40,7 @@ export function TimelineGrid({
   endMonth,
   timelineMode,
 }: TimelineGridProps) {
+  const { isRtl } = useChartDirection();
   const rowSize = useStore((s) => s.rowSize);
   const rowHeight = ROW_SIZE_MAP[rowSize];
   const gridWidth = totalUnits * unitWidth;
@@ -41,7 +50,6 @@ export function TimelineGrid({
   // Months mode: offset to next January
   const offsetToJan = (12 - ((chartStartMonth - 1) % 12)) % 12;
 
-  // Weeks mode: precompute boundary sets
   const monthBoundaries = useMemo(
     () => timelineMode === 'weeks' ? getMonthBoundaryWeeks(startYear, endYear, chartStartMonth, endMonth) : new Set<number>(),
     [timelineMode, startYear, endYear, chartStartMonth, endMonth],
@@ -54,55 +62,57 @@ export function TimelineGrid({
   return (
     <div className="pointer-events-none absolute inset-0" style={{ height: totalHeight }}>
       <svg className="absolute inset-0" width={gridWidth} height={totalHeight}>
-        {/* Vertical lines */}
+        {/* Vertical lines. `i` is a TEMPORAL boundary index; the x it maps to mirrors in RTL,
+            which is what keeps year and month emphasis on the correct edges. */}
         {Array.from({ length: totalUnits + 1 }, (_, i) => {
-          const x = i * unitWidth;
-          let isStrong = false;
-          let isExtraStrong = false;
+          const x = (isRtl ? totalUnits - i : i) * unitWidth;
 
+          let isYear = false;
+          let isMonth = false;
           if (timelineMode === 'weeks') {
-            isExtraStrong = yearBoundaries.has(i);
-            isStrong = !isExtraStrong && monthBoundaries.has(i);
+            isYear = yearBoundaries.has(i);
+            isMonth = !isYear && monthBoundaries.has(i);
           } else {
-            isStrong = i === 0 || ((i - offsetToJan) % 12 === 0 && i >= offsetToJan);
+            isYear = i === 0 || ((i - offsetToJan) % 12 === 0 && i >= offsetToJan);
+            isMonth = !isYear;
           }
+
+          const stroke = isYear
+            ? 'var(--color-grid-line-year)'
+            : isMonth
+              ? 'var(--color-grid-line-strong)'
+              : 'var(--color-grid-line)';
 
           return (
             <line
               key={i}
               x1={x}
               y1={0}
+              // Full height, not the last row: a grid that stops partway leaves the rest of
+              // the canvas an untextured plane and is the single biggest reason the chart
+              // reads as unfinished.
               x2={x}
-              y2={bottomY > 0 ? bottomY : totalHeight}
-              stroke={
-                isExtraStrong
-                  ? 'var(--color-grid-line-strong)'
-                  : isStrong
-                    ? 'var(--color-grid-line-strong)'
-                    : 'var(--color-grid-line)'
-              }
-              strokeWidth={isExtraStrong ? 1.5 : isStrong ? 1 : 0.5}
+              y2={totalHeight}
+              stroke={stroke}
+              strokeWidth={isYear ? 1.5 : isMonth ? 1 : 0.5}
             />
           );
         })}
 
-        {/* Horizontal row lines */}
-        {rows.map((row) => {
-          const y = row.y + rowHeight;
-          return (
-            <line
-              key={`h-${row.rowId}`}
-              x1={0}
-              y1={y}
-              x2={gridWidth}
-              y2={y}
-              stroke="var(--color-grid-line)"
-              strokeWidth={0.5}
-            />
-          );
-        })}
+        {/* Horizontal row lines — the lightest tier. */}
+        {rows.map((row) => (
+          <line
+            key={`h-${row.rowId}`}
+            x1={0}
+            y1={row.y + rowHeight}
+            x2={gridWidth}
+            y2={row.y + rowHeight}
+            stroke="var(--color-grid-hairline)"
+            strokeWidth={0.5}
+          />
+        ))}
 
-        {/* Bottom border at end of rows */}
+        {/* Where the rows end. */}
         {bottomY > 0 && (
           <line
             x1={0}

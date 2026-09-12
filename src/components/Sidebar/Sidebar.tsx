@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
-import { Pencil, Trash2, Plus, Merge, SplitSquareVertical, ArrowUp, ArrowDown } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Pencil, Trash2, Plus, Merge, SplitSquareVertical, ArrowUp, ArrowDown, FolderTree, ChevronDown, ChevronRight } from 'lucide-react';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { useStore } from '@/stores';
+import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { cn } from '@/lib/utils';
 import {
   ContextMenu,
@@ -16,6 +17,8 @@ type Row = {
   activityIds: string[];
   y: number;
   mergedWithNext?: boolean;
+  isGroup?: boolean;
+  collapsed?: boolean;
 };
 
 type SidebarProps = {
@@ -33,7 +36,9 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProp
   const removeRow = useStore((s) => s.removeRow);
   const toggleRowMerge = useStore((s) => s.toggleRowMerge);
   const moveRow = useStore((s) => s.moveRow);
-  const selectedActivity = useStore((s) => s.selectedActivity);
+  const toggleRowGroup = useStore((s) => s.toggleRowGroup);
+  const toggleRowCollapsed = useStore((s) => s.toggleRowCollapsed);
+  const selectedActivityIds = useStore((s) => s.selectedActivityIds);
 
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
 
@@ -53,17 +58,17 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProp
         const nextRow = rows[index + 1];
         const canMergeDown = nextRow !== undefined;
 
-        const isSelected = row.activityIds.some(
-          (aid) => selectedActivity?.activityId === aid,
-        );
+        const isSelected = row.activityIds.some((aid) => selectedActivityIds.includes(aid));
 
         return (
           <ContextMenu key={`sr-${row.rowId}`}>
             <ContextMenuTrigger asChild>
               <div
                 data-sidebar-row
+                data-row-group={row.isGroup ? '' : undefined}
                 className={cn(
                   'absolute flex items-center px-3 text-xs',
+                  row.isGroup && 'bg-muted/60 font-bold',
                   isSelected && 'bg-accent/50 text-foreground',
                   // Hide bottom border for merged leader rows (except the last in group)
                   isMergeLeader && 'border-b-0',
@@ -77,8 +82,25 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProp
                   top: row.y,
                   height: rowHeight,
                   width: '100%',
+                  // A merge leader's name spans the whole group, but each follower row is a
+                  // LATER absolutely-positioned sibling and would paint over the lower part
+                  // of that label — swallowing clicks on it. Lift the leader above them.
+                  zIndex: isMergeLeader ? 1 : undefined,
                 }}
               >
+                {row.isGroup && (
+                  <button
+                    aria-label={row.collapsed ? 'Expand phase' : 'Collapse phase'}
+                    aria-expanded={!row.collapsed}
+                    className="mr-1 shrink-0 rounded-sm p-0.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => toggleRowCollapsed(row.rowId)}
+                  >
+                    {row.collapsed
+                      ? <ChevronRight className="h-3.5 w-3.5" />
+                      : <ChevronDown className="h-3.5 w-3.5" />}
+                  </button>
+                )}
+
                 {/* Row name - show for leader or non-merged rows */}
                 {!isMergeFollower && (
                   <SidebarRowName
@@ -117,6 +139,10 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProp
                   Move Down
                 </ContextMenuItem>
               )}
+              <ContextMenuItem onClick={() => toggleRowGroup(row.rowId)}>
+                <FolderTree className="mr-2 h-3.5 w-3.5" />
+                {row.isGroup ? 'Not a phase' : 'Make phase header'}
+              </ContextMenuItem>
               {canMergeDown && (
                 <ContextMenuItem onClick={() => toggleRowMerge(row.rowId)}>
                   {row.mergedWithNext ? (
@@ -157,6 +183,11 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown }: SidebarProp
   );
 }
 
+/**
+ * Row name cell. The editor is a separate component mounted only while editing, so its
+ * initial value comes from props rather than an effect that re-seeds state on every
+ * `isEditing` flip.
+ */
 function SidebarRowName({
   name,
   isEditing,
@@ -174,62 +205,79 @@ function SidebarRowName({
   mergeSpan: number;
   rowHeight: number;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [value, setValue] = useState(name);
-  const lastTapRef = useRef<{ time: number; x: number; y: number }>({ time: 0, x: 0, y: 0 });
-
-  useEffect(() => {
-    if (isEditing) {
-      setValue(name);
-      setTimeout(() => {
-        inputRef.current?.focus();
-        inputRef.current?.select();
-      }, 0);
-    }
-  }, [isEditing, name]);
-
+  const checkDoubleTap = useDoubleTap();
   const spanHeight = rowHeight * mergeSpan;
 
   if (isEditing) {
     return (
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onBlur={() => onCommit(value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') onCommit(value);
-          if (e.key === 'Escape') onCancel();
-        }}
-        className="w-full bg-transparent text-xs font-medium text-foreground outline-none px-1 -mx-1 border border-ring rounded"
+      <RowNameInput
+        initialName={name}
+        onCommit={onCommit}
+        onCancel={onCancel}
         style={mergeSpan > 1 ? { height: spanHeight - 8, position: 'absolute', top: 4, left: 8, right: 8, width: 'auto' } : undefined}
       />
     );
   }
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    const now = Date.now();
-    const last = lastTapRef.current;
-    if (now - last.time < 300 && Math.abs(e.clientX - last.x) < 25 && Math.abs(e.clientY - last.y) < 25) {
-      lastTapRef.current = { time: 0, x: 0, y: 0 };
-      onStartEdit();
-      return;
-    }
-    lastTapRef.current = { time: now, x: e.clientX, y: e.clientY };
-  };
-
   return (
     <span
+      dir="auto"
+      data-user-text
+      title={name || undefined}
       className={cn(
-        'truncate flex-1 cursor-text text-[13px] font-semibold text-muted-foreground/80 hover:text-foreground transition-colors',
+        'truncate flex-1 cursor-text text-body font-semibold text-muted-foreground/80 hover:text-foreground transition-colors',
         mergeSpan > 1 && 'absolute left-3 right-3 flex items-center',
       )}
       onDoubleClick={onStartEdit}
-      onPointerDown={handlePointerDown}
+      onPointerDown={(e) => {
+        // Touch/pen only — a mouse is served by onDoubleClick above.
+        if (checkDoubleTap(e, 'row-name')) onStartEdit();
+      }}
       style={mergeSpan > 1 ? { height: spanHeight, top: 0 } : undefined}
     >
       {name || <span className="italic opacity-40 text-xs font-normal">Double-click to name</span>}
     </span>
+  );
+}
+
+function RowNameInput({
+  initialName,
+  onCommit,
+  onCancel,
+  style,
+}: {
+  initialName: string;
+  onCommit: (name: string) => void;
+  onCancel: () => void;
+  style?: React.CSSProperties;
+}) {
+  const [value, setValue] = useState(initialName);
+  const settledRef = useRef(false);
+
+  const finish = (save: boolean) => {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    if (save) onCommit(value);
+    else onCancel();
+  };
+
+  return (
+    <input
+      autoFocus
+      dir="auto"
+      aria-label="Row name"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onBlur={() => finish(true)}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') finish(true);
+        if (e.key === 'Escape') finish(false);
+      }}
+      className="w-full bg-transparent text-xs font-medium text-foreground outline-none px-1 -mx-1 border border-ring rounded"
+      style={style}
+    />
   );
 }
 

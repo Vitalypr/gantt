@@ -15,6 +15,12 @@ export function useDoubleTap() {
     e: PointerEvent | React.PointerEvent,
     key = '',
   ): boolean => {
+    // A mouse already produces a native `dblclick`, and every call site handles that too.
+    // Answering true here as well runs the action twice — which added two sidebar rows for
+    // any double-click faster than DOUBLE_TAP_DELAY (300ms), while a slower one inside the
+    // OS window (500ms) added one. That gap is why the bug looked intermittent.
+    if (e.pointerType === 'mouse') return false;
+
     const now = Date.now();
     const last = lastTapRef.current;
     const isDouble =

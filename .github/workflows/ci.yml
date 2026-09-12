@@ -1,0 +1,55 @@
+name: CI
+
+# `deploy:gh` publishes straight from a developer's machine and `lint` is invoked by no build
+# script, so without this nothing verifies a change unless a human remembers to.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm exec tsc -b
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Single-file build
+        run: pnpm build:single
+
+      # The single-file HTML is a tracked artifact kept current by .githooks/pre-commit.
+      # If it drifts, the committed distributable no longer matches the source it claims
+      # to be built from.
+      - name: dist-single is in sync with source
+        run: git diff --exit-code -- dist-single/index.html
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: pnpm exec playwright test --project=chromium
+        env:
+          # CI has no system Chrome; use the browser installed above.
+          PLAYWRIGHT_CHANNEL: ''

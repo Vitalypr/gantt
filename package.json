@@ -4,15 +4,19 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks || echo \"prepare: not a git checkout, hooks not wired\"",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:exe": "pnpm build && pkg --config package.json launcher/server.cjs --targets node22-win-x64 --output dist-exe/GanttChart.exe --compress GZip",
+    "build:exe:web": "tsc -b && vite build --base=./",
+    "build:exe": "pnpm build:exe:web && pkg --config package.json launcher/server.cjs --targets node22-win-x64 --output dist-exe/GanttChart.exe --compress GZip",
     "build:single": "tsc -b && vite build --config vite.singlefile.config.ts",
-    "deploy:gh": "pnpm run build && npx gh-pages -d dist"
+    "deploy:gh": "pnpm run build && npx gh-pages -d dist",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "pkg": {
     "assets": [
@@ -41,6 +45,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4.1.11",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -54,6 +59,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "gh-pages": "^6.3.0",
     "globals": "^16.5.0",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.1.11",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",

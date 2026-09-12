@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { useStore } from '@/stores';
 import { ActivityBar } from '@/components/Activity/ActivityBar';
@@ -7,6 +8,17 @@ import type { useDragCreate } from '@/hooks/useDragCreate';
 import type { useDragMove } from '@/hooks/useDragMove';
 import type { useDragResize } from '@/hooks/useDragResize';
 import type { useDragRowSpan } from '@/hooks/useDragRowSpan';
+
+/**
+ * Client-space x of the timeline body's left edge.
+ *
+ * Measured from the element rather than derived as `sidebarWidth - scrollLeft`: in RTL the
+ * sidebar is on the other side, so that arithmetic is simply wrong, and measuring is correct
+ * in both directions with no branch. See the `[data-timeline-body]` DOM contract in CLAUDE.md.
+ */
+function timelineLeftOffset(): number {
+  return document.querySelector('[data-timeline-body]')?.getBoundingClientRect().left ?? 0;
+}
 
 type Row = {
   rowId: string;
@@ -18,7 +30,7 @@ type Row = {
 type TimelineBodyProps = {
   rows: Row[];
   monthWidth: number;
-  sidebarWidth: number;
+  totalUnits: number;
   dragCreate: ReturnType<typeof useDragCreate>;
   dragMove: ReturnType<typeof useDragMove>;
   dragResize: ReturnType<typeof useDragResize>;
@@ -29,7 +41,7 @@ type TimelineBodyProps = {
 export function TimelineBody({
   rows,
   monthWidth,
-  sidebarWidth,
+  totalUnits,
   dragCreate,
   dragMove,
   dragResize,
@@ -39,18 +51,35 @@ export function TimelineBody({
   const rowSize = useStore((s) => s.rowSize);
   const rowHeight = ROW_SIZE_MAP[rowSize];
   const allActivities = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.activities : s.chart.activities);
-  const selectedActivity = useStore((s) => s.selectedActivity);
+  const selectedActivityIds = useStore((s) => s.selectedActivityIds);
   const selectActivity = useStore((s) => s.selectActivity);
+  const toggleActivitySelection = useStore((s) => s.toggleActivitySelection);
   const editingActivity = useStore((s) => s.editingActivity);
   const setEditingActivity = useStore((s) => s.setEditingActivity);
   const selectDependency = useStore((s) => s.selectDependency);
+
+  // Resolved through a Map, not `activityIds.map(id => activities.find(...))`. This body
+  // re-renders on every pointermove during a drag, and the nested scan made that O(n^2)
+  // per frame.
+  const activityById = useMemo(() => {
+    const m = new Map<string, (typeof allActivities)[number]>();
+    for (const a of allActivities) m.set(a.id, a);
+    return m;
+  }, [allActivities]);
 
   return (
     <div className="absolute inset-0">
       {rows.map((row) => {
         const activities = row.activityIds
-          .map((aid) => allActivities.find((a) => a.id === aid))
+          .map((aid) => activityById.get(aid))
           .filter((a): a is NonNullable<typeof a> => a != null);
+
+        // While a bar is being dragged out of this row, the row itself must sit above its
+        // neighbours or the translated bar is clipped behind them.
+        const isDragSourceRow =
+          dragMove.dragState != null &&
+          row.activityIds.includes(dragMove.dragState.activityId) &&
+          dragMove.dragState.rowOffset !== 0;
 
         const hasSpanningActivity = activities.some((a) => {
           const span = dragRowSpan.dragState?.activityId === a.id
@@ -69,16 +98,17 @@ export function TimelineBody({
               left: 0,
               right: 0,
               overflow: 'visible',
-              zIndex: hasSpanningActivity ? 1 : undefined,
+              zIndex: isDragSourceRow ? 30 : hasSpanningActivity ? 1 : undefined,
             }}
             onPointerDown={(e) => {
               if (e.button !== 0) return;
               if ((e.target as HTMLElement).closest('[data-activity-bar]')) return;
               selectDependency(null);
-              const scrollContainer = document.querySelector('[data-gantt-scroll]');
-              const scrollLeft = scrollContainer?.scrollLeft ?? 0;
-              const offset = sidebarWidth - scrollLeft;
-              dragCreate.onPointerDown(e, row.rowId, offset, monthWidth);
+              dragCreate.onPointerDown(e, row.rowId, timelineLeftOffset(), monthWidth, totalUnits);
+            }}
+            onDoubleClick={(e) => {
+              if ((e.target as HTMLElement).closest('[data-activity-bar]')) return;
+              dragCreate.onDoubleClick(e, row.rowId, timelineLeftOffset(), monthWidth, totalUnits);
             }}
           >
             {/* Ghost bar from drag-create */}
@@ -101,7 +131,7 @@ export function TimelineBody({
 
             {/* Render all activities in this row */}
             {activities.map((activity) => {
-              const isSelected = selectedActivity?.activityId === activity.id;
+              const isSelected = selectedActivityIds.includes(activity.id);
               const isEditing = editingActivity?.activityId === activity.id;
 
               const moveOverride =
@@ -120,10 +150,16 @@ export function TimelineBody({
                     key={activity.id}
                     activity={activity}
                     monthWidth={monthWidth}
+                    totalUnits={totalUnits}
                     isSelected={isSelected}
                     isEditing={isEditing}
                     moveOverride={moveOverride}
-                    onSelect={() => selectActivity({ activityId: activity.id })}
+                    dragOffsetY={(moveOverride?.rowOffset ?? 0) * rowHeight}
+                    onSelect={(additive) =>
+                      additive
+                        ? toggleActivitySelection(activity.id)
+                        : selectActivity({ activityId: activity.id })
+                    }
                     onDoubleClick={() => setEditingActivity({ activityId: activity.id })}
                     onDragMoveStart={(e) => dragMove.onPointerDown(e, activity.id, activity.startMonth)}
                     onAnchorPointerDown={onAnchorPointerDown}
@@ -145,14 +181,20 @@ export function TimelineBody({
                   key={activity.id}
                   activity={activity}
                   monthWidth={monthWidth}
+                  totalUnits={totalUnits}
                   isSelected={isSelected}
                   isEditing={isEditing}
                   moveOverride={moveOverride}
+                  dragOffsetY={(moveOverride?.rowOffset ?? 0) * rowHeight}
                   resizeOverride={resizeOverride}
                   rowSpan={activityRowSpan}
                   rowSpanOverride={rowSpanOverride}
                   topOffsetOverride={topOffsetOverride}
-                  onSelect={() => selectActivity({ activityId: activity.id })}
+                  onSelect={(additive) =>
+                    additive
+                      ? toggleActivitySelection(activity.id)
+                      : selectActivity({ activityId: activity.id })
+                  }
                   onDoubleClick={() => setEditingActivity({ activityId: activity.id })}
                   onDragMoveStart={(e) => dragMove.onPointerDown(e, activity.id, activity.startMonth)}
                   onDragResizeStart={(e, edge) =>

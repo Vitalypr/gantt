@@ -4,6 +4,8 @@ import { useStore } from '@/stores';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import type { RowLayout } from '@/components/GanttChart/GanttChart';
 import type { DragConnectState } from '@/hooks/useDragConnect';
+import { useChartDirection } from '@/hooks/useChartDirection';
+import { resolveAnchorSide } from '@/utils/timeline';
 import {
   getActivityRect,
   getAnchorPoint,
@@ -15,6 +17,7 @@ import {
 type DependencyLayerProps = {
   rows: RowLayout[];
   monthWidth: number;
+  totalUnits: number;
   timelineWidth: number;
   bodyHeight: number;
   dragConnect: DragConnectState;
@@ -27,10 +30,12 @@ const GHOST_COLOR = 'var(--color-dep-ghost)';
 export function DependencyLayer({
   rows,
   monthWidth,
+  totalUnits,
   timelineWidth,
   bodyHeight,
   dragConnect,
 }: DependencyLayerProps) {
+  const { isRtl } = useChartDirection();
   const rowSize = useStore((s) => s.rowSize);
   const rowHeight = ROW_SIZE_MAP[rowSize];
   const activities = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.activities : s.chart.activities);
@@ -119,11 +124,16 @@ export function DependencyLayer({
           const toRowY = rowYMap.get(dep.toActivityId);
           if (fromRowY === undefined || toRowY === undefined) return null;
 
-          const fromRect = getActivityRect(fromActivity, fromRowY, monthWidth, fromActivity.rowSpan ?? 1, rowHeight);
-          const toRect = getActivityRect(toActivity, toRowY, monthWidth, toActivity.rowSpan ?? 1, rowHeight);
-          const fromPt = getAnchorPoint(fromRect, dep.fromSide);
-          const toPt = getAnchorPoint(toRect, dep.toSide);
-          const waypoints = routeOrthogonal(fromPt, dep.fromSide, toPt, dep.toSide, rowHeight);
+          const fromRect = getActivityRect({ activity: fromActivity, rowY: fromRowY, unitWidth: monthWidth, totalUnits, isRtl, rowSpan: fromActivity.rowSpan ?? 1, rowHeight });
+          const toRect = getActivityRect({ activity: toActivity, rowY: toRowY, unitWidth: monthWidth, totalUnits, isRtl, rowSpan: toActivity.rowSpan ?? 1, rowHeight });
+          // Sides persist TEMPORALLY and resolve to physical edges here. Storing them
+          // physically would make the same JSON render differently per direction and turn a
+          // finish-to-start hop into a chart-spanning U-detour on flip.
+          const fromSide = resolveAnchorSide(dep.fromSide, isRtl);
+          const toSide = resolveAnchorSide(dep.toSide, isRtl);
+          const fromPt = getAnchorPoint(fromRect, fromSide);
+          const toPt = getAnchorPoint(toRect, toSide);
+          const waypoints = routeOrthogonal(fromPt, fromSide, toPt, toSide, rowHeight);
           const pathD = pointsToSvgPath(waypoints);
           const isSelected = selectedDependency?.dependencyId === dep.id;
 

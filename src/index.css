@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+@import './fonts.css';
 @import 'tailwindcss';
 
 @theme {
@@ -23,19 +23,42 @@
   --color-card-foreground: #1a1d23;
   --color-surface: #ffffff;
 
+  /* Four grid tiers, differentiated by colour AND stroke width. Two tiers drawn in the same
+     colour are one tier. */
+  --color-grid-hairline: #eef2f6;
   --color-grid-line: #e2e8f0;
   --color-grid-line-strong: #cbd5e1;
+  --color-grid-line-year: #94a3b8;
   --color-dep-arrow: #9ca3af;
   --color-dep-arrow-selected: #6366f1;
   --color-dep-ghost: #d1d5db;
   --color-anchor-dot-bg: #9ca3af;
   --color-anchor-dot-border: #ffffff;
+  --color-bar-outline: #9ca3af;
+  /* Half-transparent red, so the grid still reads through a shaded column. */
+  --color-holiday: rgb(239 68 68 / 0.5);
+
+  /* Type scale. Use these, never an arbitrary text-[13px]; nine ad-hoc sizes is how a
+     header band ends up reading as one undifferentiated block. */
+  --text-micro: 10px;
+  --text-meta: 11px;
+  --text-label: 12px;
+  --text-body: 13px;
+  --text-title: 15px;
+
+  /* One z scale. A local z-index creates a stacking context that traps everything inside
+     it — lift the element, not its container. */
+  --z-grid: 0;
+  --z-bar: 10;
+  --z-bar-spanning: 20;
+  --z-arrow: 30;
+  --z-overlay: 40;
 
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
 
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: 'Gantt Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   --shadow-bar: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-bar-hover: 0 4px 12px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
@@ -65,16 +88,20 @@
   --color-card-foreground: #e2e4e9;
   --color-surface: #161822;
 
+  --color-grid-hairline: #171a24;
   --color-grid-line: #1e2130;
   --color-grid-line-strong: #2a2d3a;
+  --color-grid-line-year: #454a5e;
   --color-dep-arrow: #6b7084;
   --color-dep-arrow-selected: #818cf8;
   --color-dep-ghost: #3a3d4a;
   --color-anchor-dot-bg: #6b7084;
   --color-anchor-dot-border: #161822;
+  --color-bar-outline: #6b7084;
+  --color-holiday: rgb(248 113 113 / 0.5);
 
-  --shadow-bar: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-bar-hover: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-bar: inset 0 0 0 1px rgb(255 255 255 / 0.08), 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-bar-hover: inset 0 0 0 1px rgb(255 255 255 / 0.14), 0 4px 12px rgba(0, 0, 0, 0.5);
   --shadow-bar-selected: 0 0 0 2px rgba(129, 140, 248, 0.5), 0 4px 12px rgba(129, 140, 248, 0.2);
 }
 
@@ -138,6 +165,7 @@ body {
 
 /* Activity bar transitions */
 .activity-bar {
+  box-shadow: var(--shadow-bar);
   transition: box-shadow 0.15s ease, transform 0.1s ease;
   touch-action: none;
 }
@@ -347,4 +375,93 @@ body {
 
 .today-dot {
   animation: today-pulse 3s ease-in-out infinite;
+}
+
+/* ---------------------------------------------------------------------------
+   Focus. Eight date controls, the Mo/Wk toggle, the colour swatches and the inline
+   rename input all set `outline-none`; without a replacement, tabbing produced no
+   feedback anywhere (WCAG 2.4.7). Never opt out of this without providing another.
+   --------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Anything that animates on a loop needs an escape hatch. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .today-dot {
+    animation: none;
+  }
+}
+
+/* User-entered text can be Hebrew, English or mixed. `dir="auto"` lets the browser pick per
+   string — but only on LEAVES: `direction` reverses flex main-axis order, and the bar root
+   is a flex container whose children include the resize handles. */
+[data-activity-label],
+[data-user-text] {
+  unicode-bidi: plaintext;
+}
+
+/* Holiday shading. Behind the bars, never interactive. */
+.bg-holiday {
+  background-color: var(--color-holiday);
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Print / PDF. The browser's own "Save as PDF" is the export path: no extra
+   dependency, vector text, and the user's existing page-size and margin controls.
+   --------------------------------------------------------------------------- */
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  /* Chrome is for editing; only the chart is the deliverable. */
+  [data-app-chrome] {
+    display: none !important;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  /* The scroll container clips to the viewport on screen; printing must see all of it. */
+  [data-gantt-scroll] {
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Sticky headers repeat or float oddly across printed pages. */
+  [data-gantt-grid] .sticky,
+  [data-gantt-grid] [class*='sticky'] {
+    position: static !important;
+  }
+
+  /* Never split a row across a page break. */
+  [data-sidebar-row],
+  [data-activity-bar] {
+    break-inside: avoid;
+  }
+
+  /* Bars are the content; a printer that drops backgrounds would print a blank chart. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }

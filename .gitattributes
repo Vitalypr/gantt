@@ -1,0 +1,5 @@
+# dist-single/index.html is a build artifact committed verbatim. The inlined bundle
+# contains raw CR bytes inside JS string literals, so autocrlf=true would rewrite them
+# on checkout — corrupting the bundle and producing a diff on every rebuild.
+# -text disables all end-of-line conversion for it.
+dist-single/index.html -text

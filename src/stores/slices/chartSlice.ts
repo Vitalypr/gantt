@@ -1,18 +1,34 @@
 import type { StateCreator } from 'zustand';
 import { nanoid } from 'nanoid';
-import type { Activity, Dependency, GanttChart, WeeksChart, TimelineMode } from '@/types/gantt';
+import type { Activity, Chart, ChartMarker, Dependency, GanttRow, MonthsChart, WeeksChart, TimelineMode } from '@/types/gantt';
 import { loadAutoSave, loadWeeksAutoSave } from '@/utils/persistence';
 
-type ActiveChart = GanttChart | WeeksChart;
+type ActiveChart = Chart;
+
+/**
+ * A relative change to an activity's placement.
+ *
+ * One action covers keyboard nudge, keyboard resize and keyboard row-change because they are
+ * the same operation with different fields set - and because a gesture that changed two of
+ * them through two actions would cost two Ctrl+Z presses.
+ */
+export type ActivityDelta = {
+  /** Units later (positive) or earlier (negative). */
+  units?: number;
+  /** Units longer or shorter. */
+  duration?: number;
+  /** Rows down (positive) or up (negative). */
+  rows?: number;
+};
 
 export type ChartSlice = {
-  chart: GanttChart;
+  chart: MonthsChart;
   weeksChart: WeeksChart;
 
   // Mode-aware accessors — internal use
   _activeChart: () => ActiveChart;
 
-  setChart: (chart: GanttChart) => void;
+  setChart: (chart: MonthsChart) => void;
   setWeeksChart: (chart: WeeksChart) => void;
   setChartName: (name: string) => void;
   setDateRange: (startYear: number, startMonth: number, endYear: number, endMonth: number) => void;
@@ -21,13 +37,37 @@ export type ChartSlice = {
   renameRow: (rowId: string, name: string) => void;
   removeRow: (rowId: string) => void;
   toggleRowMerge: (rowId: string) => void;
+  toggleRowGroup: (rowId: string) => void;
+  toggleRowCollapsed: (rowId: string) => void;
   moveRow: (rowId: string, direction: 'up' | 'down') => void;
 
   addActivity: (activity: Omit<Activity, 'id' | 'order'>, rowId: string) => string;
   updateActivity: (activityId: string, updates: Partial<Activity>) => void;
+  /** Same update across many activities in ONE commit, so a bulk restyle is one Ctrl+Z. */
+  updateActivities: (activityIds: string[], updates: Partial<Activity>) => void;
+  removeActivities: (activityIds: string[]) => void;
+  /** Copy activities in place, returning the new ids so selection can follow them. */
+  duplicateActivities: (activityIds: string[], unitOffset: number) => string[];
+  /** Relative move/resize/row-change for a whole selection, in ONE commit. */
+  transformActivities: (activityIds: string[], delta: ActivityDelta) => void;
+  /** Insert copies of detached activity data (clipboard paste). Returns the new ids. */
+  pasteActivities: (activities: Activity[], intoRowId?: string) => string[];
   removeActivity: (activityId: string) => void;
 
   reParentActivity: (activityId: string, toRowId: string) => void;
+  /** Position + row in ONE commit, so a diagonal drag costs one Ctrl+Z. */
+  moveActivity: (activityId: string, startUnit: number, toRowId?: string) => void;
+  /** Row span + row in ONE commit, for the same reason. */
+  setActivityRowSpan: (activityId: string, rowSpan: number, toRowId?: string) => void;
+
+  /** Replace the active chart's rows and activities with a template. One commit. */
+  applyTemplate: (rows: GanttRow[], activities: Activity[]) => void;
+
+  setLegendLabel: (color: string, label: string) => void;
+
+  addMarker: (marker: Omit<ChartMarker, 'id'>) => string;
+  updateMarker: (id: string, updates: Partial<Omit<ChartMarker, 'id'>>) => void;
+  removeMarker: (id: string) => void;
 
   addDependency: (dep: Omit<Dependency, 'id'>) => string;
   removeDependency: (id: string) => void;
@@ -38,11 +78,12 @@ type ModeDeps = {
   timelineMode: TimelineMode;
 };
 
-function createDefaultChart(): GanttChart {
+function createDefaultChart(): MonthsChart {
   const now = new Date();
   const currentYear = now.getFullYear();
   return {
     id: nanoid(),
+    unit: 'month',
     name: 'New Project',
     startYear: currentYear,
     startMonth: 1,
@@ -61,6 +102,7 @@ function createDefaultWeeksChart(): WeeksChart {
   const currentYear = now.getFullYear();
   return {
     id: nanoid(),
+    unit: 'week',
     name: 'New Project (Weeks)',
     startYear: currentYear,
     startMonth: 1,
@@ -74,13 +116,34 @@ function createDefaultWeeksChart(): WeeksChart {
   };
 }
 
+/**
+ * Apply a partial update to one activity, in place.
+ *
+ * `in` rather than `!== undefined` for the two optional-by-design fields: undefined is the
+ * meaningful "reset to the default" value for both, so they must be assignable to undefined.
+ * Single and bulk updates share this so the two cannot drift.
+ */
+function applyActivityUpdates(activity: Activity, updates: Partial<Activity>): void {
+  if (updates.name !== undefined) activity.name = updates.name;
+  if (updates.color !== undefined) activity.color = updates.color;
+  if (updates.startMonth !== undefined) activity.startMonth = updates.startMonth;
+  if (updates.durationMonths !== undefined) activity.durationMonths = updates.durationMonths;
+  if (updates.order !== undefined) activity.order = updates.order;
+  if (updates.isMilestone !== undefined) activity.isMilestone = updates.isMilestone;
+  if (updates.rowSpan !== undefined) activity.rowSpan = updates.rowSpan;
+  if (updates.progress !== undefined) activity.progress = updates.progress;
+  if ('annotation' in updates) activity.annotation = updates.annotation;
+  if ('outlineColor' in updates) activity.outlineColor = updates.outlineColor;
+  if ('fontSize' in updates) activity.fontSize = updates.fontSize;
+}
+
 /** Helper: get the active chart from state (months or weeks) */
 function active(state: ChartSlice & ModeDeps): ActiveChart {
   return state.timelineMode === 'weeks' ? state.weeksChart : state.chart;
 }
 
 /** Helper: mutate the active chart in an immer draft */
-function withActive(state: ChartSlice & ModeDeps): GanttChart | WeeksChart {
+function withActive(state: ChartSlice & ModeDeps): Chart {
   return state.timelineMode === 'weeks' ? state.weeksChart : state.chart;
 }
 
@@ -221,6 +284,27 @@ export const createChartSlice: StateCreator<ChartSlice & ModeDeps, [['zustand/im
       c.updatedAt = new Date().toISOString();
     }),
 
+  toggleRowGroup: (rowId) =>
+    set((state) => {
+      const c = withActive(state);
+      const row = c.rows.find((r) => r.id === rowId);
+      if (!row) return;
+      row.isGroup = !row.isGroup;
+      // A row that is no longer a group cannot stay collapsed, or its members would be
+      // hidden with nothing left to expand them.
+      if (!row.isGroup) row.collapsed = undefined;
+      c.updatedAt = new Date().toISOString();
+    }),
+
+  toggleRowCollapsed: (rowId) =>
+    set((state) => {
+      const c = withActive(state);
+      const row = c.rows.find((r) => r.id === rowId);
+      if (!row?.isGroup) return;
+      row.collapsed = !row.collapsed;
+      c.updatedAt = new Date().toISOString();
+    }),
+
   moveRow: (rowId, direction) =>
     set((state) => {
       const c = withActive(state);
@@ -265,17 +349,121 @@ export const createChartSlice: StateCreator<ChartSlice & ModeDeps, [['zustand/im
       const c = withActive(state);
       const activity = c.activities.find((a) => a.id === activityId);
       if (activity) {
-        if (updates.name !== undefined) activity.name = updates.name;
-        if (updates.color !== undefined) activity.color = updates.color;
-        if (updates.startMonth !== undefined) activity.startMonth = updates.startMonth;
-        if (updates.durationMonths !== undefined) activity.durationMonths = updates.durationMonths;
-        if (updates.order !== undefined) activity.order = updates.order;
-        if (updates.isMilestone !== undefined) activity.isMilestone = updates.isMilestone;
-        if (updates.rowSpan !== undefined) activity.rowSpan = updates.rowSpan;
-        if ('annotation' in updates) activity.annotation = updates.annotation;
+        applyActivityUpdates(activity, updates);
         c.updatedAt = new Date().toISOString();
       }
     }),
+
+  updateActivities: (activityIds, updates) =>
+    set((state) => {
+      const c = withActive(state);
+      const ids = new Set(activityIds);
+      let touched = false;
+      for (const activity of c.activities) {
+        if (!ids.has(activity.id)) continue;
+        applyActivityUpdates(activity, updates);
+        touched = true;
+      }
+      if (touched) c.updatedAt = new Date().toISOString();
+    }),
+
+  removeActivities: (activityIds) =>
+    set((state) => {
+      const c = withActive(state);
+      const ids = new Set(activityIds);
+      if (ids.size === 0) return;
+      c.activities = c.activities.filter((a) => !ids.has(a.id));
+      for (const row of c.rows) {
+        row.activityIds = row.activityIds.filter((id) => !ids.has(id));
+      }
+      c.dependencies = c.dependencies.filter(
+        (d) => !ids.has(d.fromActivityId) && !ids.has(d.toActivityId),
+      );
+      c.updatedAt = new Date().toISOString();
+    }),
+
+  duplicateActivities: (activityIds, unitOffset) => {
+    const newIds: string[] = [];
+    set((state) => {
+      const c = withActive(state);
+      const ids = new Set(activityIds);
+      let maxOrder = c.activities.reduce((max, a) => Math.max(max, a.order), -1);
+      // Snapshot first: pushing into the array while iterating it would copy the copies.
+      const sources = c.activities.filter((a) => ids.has(a.id));
+      for (const source of sources) {
+        const row = c.rows.find((r) => r.activityIds.includes(source.id));
+        if (!row) continue;
+        const id = nanoid();
+        newIds.push(id);
+        c.activities.push({
+          ...source,
+          id,
+          order: ++maxOrder,
+          startMonth: Math.max(0, source.startMonth + unitOffset),
+        });
+        row.activityIds.push(id);
+      }
+      if (newIds.length > 0) c.updatedAt = new Date().toISOString();
+    });
+    return newIds;
+  },
+
+  transformActivities: (activityIds, delta) =>
+    set((state) => {
+      const c = withActive(state);
+      const ids = new Set(activityIds);
+      if (ids.size === 0) return;
+
+      const ordered = [...c.rows].sort((a, b) => a.order - b.order);
+      let touched = false;
+
+      for (const activity of c.activities) {
+        if (!ids.has(activity.id)) continue;
+
+        if (delta.units) {
+          activity.startMonth = Math.max(0, activity.startMonth + delta.units);
+          touched = true;
+        }
+        if (delta.duration) {
+          activity.durationMonths = Math.max(1, activity.durationMonths + delta.duration);
+          touched = true;
+        }
+        if (delta.rows) {
+          const fromIndex = ordered.findIndex((r) => r.activityIds.includes(activity.id));
+          if (fromIndex < 0) continue;
+          const toIndex = Math.max(0, Math.min(ordered.length - 1, fromIndex + delta.rows));
+          if (toIndex !== fromIndex) {
+            const from = ordered[fromIndex]!;
+            const to = ordered[toIndex]!;
+            from.activityIds = from.activityIds.filter((id) => id !== activity.id);
+            to.activityIds.push(activity.id);
+            touched = true;
+          }
+        }
+      }
+
+      if (touched) c.updatedAt = new Date().toISOString();
+    }),
+
+  pasteActivities: (incoming, intoRowId) => {
+    const newIds: string[] = [];
+    set((state) => {
+      const c = withActive(state);
+      if (c.rows.length === 0 || incoming.length === 0) return;
+      const ordered = [...c.rows].sort((a, b) => a.order - b.order);
+      const target = c.rows.find((r) => r.id === intoRowId) ?? ordered[0]!;
+      let maxOrder = c.activities.reduce((max, a) => Math.max(max, a.order), -1);
+      for (const source of incoming) {
+        const id = nanoid();
+        newIds.push(id);
+        // A fresh id and order; everything else about the bar is preserved.
+        c.activities.push({ ...source, id, order: ++maxOrder });
+        target.activityIds.push(id);
+      }
+      c.updatedAt = new Date().toISOString();
+    });
+    return newIds;
+  },
 
   removeActivity: (activityId) =>
     set((state) => {
@@ -304,6 +492,116 @@ export const createChartSlice: StateCreator<ChartSlice & ModeDeps, [['zustand/im
       if (targetRow && !targetRow.activityIds.includes(activityId)) {
         targetRow.activityIds.push(activityId);
       }
+      c.updatedAt = new Date().toISOString();
+    }),
+
+  moveActivity: (activityId, startUnit, toRowId) =>
+    set((state) => {
+      const c = withActive(state);
+      const activity = c.activities.find((a) => a.id === activityId);
+      if (!activity) return;
+
+      activity.startMonth = Math.max(0, startUnit);
+
+      if (toRowId) {
+        const currentRow = c.rows.find((r) => r.activityIds.includes(activityId));
+        if (currentRow?.id !== toRowId) {
+          const targetRow = c.rows.find((r) => r.id === toRowId);
+          // Only detach once the destination is known to exist, or a bad id orphans the bar.
+          if (targetRow) {
+            if (currentRow) {
+              currentRow.activityIds = currentRow.activityIds.filter((id) => id !== activityId);
+            }
+            if (!targetRow.activityIds.includes(activityId)) {
+              targetRow.activityIds.push(activityId);
+            }
+          }
+        }
+      }
+
+      c.updatedAt = new Date().toISOString();
+    }),
+
+  setActivityRowSpan: (activityId, rowSpan, toRowId) =>
+    set((state) => {
+      const c = withActive(state);
+      const activity = c.activities.find((a) => a.id === activityId);
+      if (!activity) return;
+
+      activity.rowSpan = Math.max(1, rowSpan);
+
+      if (toRowId) {
+        const currentRow = c.rows.find((r) => r.activityIds.includes(activityId));
+        if (currentRow?.id !== toRowId) {
+          const targetRow = c.rows.find((r) => r.id === toRowId);
+          if (targetRow) {
+            if (currentRow) {
+              currentRow.activityIds = currentRow.activityIds.filter((id) => id !== activityId);
+            }
+            if (!targetRow.activityIds.includes(activityId)) {
+              targetRow.activityIds.push(activityId);
+            }
+          }
+        }
+      }
+
+      c.updatedAt = new Date().toISOString();
+    }),
+
+  applyTemplate: (rows, activities) =>
+    set((state) => {
+      const c = withActive(state);
+      // Wholesale replacement in ONE commit, so a template applied by mistake is one Ctrl+Z.
+      c.rows = rows;
+      c.activities = activities;
+      c.dependencies = [];
+      c.updatedAt = new Date().toISOString();
+    }),
+
+  setLegendLabel: (color, label) =>
+    set((state) => {
+      const c = withActive(state);
+      const entries = [...(c.legend ?? [])];
+      const i = entries.findIndex((e) => e.color === color);
+      const trimmed = label.trim();
+      // An empty label means "no meaning assigned", which is an absent entry rather than a
+      // blank row in the legend.
+      if (!trimmed) {
+        if (i >= 0) entries.splice(i, 1);
+      } else if (i >= 0) {
+        entries[i] = { color, label: trimmed };
+      } else {
+        entries.push({ color, label: trimmed });
+      }
+      c.legend = entries;
+      c.updatedAt = new Date().toISOString();
+    }),
+
+  addMarker: (marker) => {
+    const id = nanoid();
+    set((state) => {
+      const c = withActive(state);
+      c.markers = [...(c.markers ?? []), { ...marker, id }];
+      c.updatedAt = new Date().toISOString();
+    });
+    return id;
+  },
+
+  updateMarker: (id, updates) =>
+    set((state) => {
+      const c = withActive(state);
+      const marker = c.markers?.find((m) => m.id === id);
+      if (!marker) return;
+      if (updates.name !== undefined) marker.name = updates.name;
+      if (updates.date !== undefined) marker.date = updates.date;
+      if ('color' in updates) marker.color = updates.color;
+      c.updatedAt = new Date().toISOString();
+    }),
+
+  removeMarker: (id) =>
+    set((state) => {
+      const c = withActive(state);
+      c.markers = (c.markers ?? []).filter((m) => m.id !== id);
       c.updatedAt = new Date().toISOString();
     }),
 

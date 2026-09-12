@@ -1,4 +1,5 @@
 import type { Activity, AnchorSide } from '@/types/gantt';
+import { unitSpanToLeft } from '@/utils/timeline';
 
 type Point = { x: number; y: number };
 type Rect = { left: number; top: number; width: number; height: number };
@@ -6,30 +7,45 @@ type Rect = { left: number; top: number; width: number; height: number };
 const BAR_PADDING_TOP = 4;
 const STEP_OUT = 12;
 
-export function getActivityRect(
-  activity: Activity,
-  rowY: number,
-  monthWidth: number,
+export type ActivityRectInput = {
+  activity: Activity;
+  rowY: number;
+  unitWidth: number;
+  totalUnits: number;
+  isRtl: boolean;
+  rowSpan?: number;
+  rowHeight?: number;
+};
+
+/**
+ * The box an activity is drawn in — the single description of activity geometry.
+ *
+ * A milestone is a one-unit bar with a heavy frame, not a diamond, so ONE computation
+ * describes both shapes. When these were two, routing modelled a milestone as a
+ * `round(rowHeight * 0.55)` square while the component drew a full unit-wide box — 22px
+ * against 76px at default zoom — so arrows terminated well inside the shape and the snap
+ * test probed where the anchor dot was not.
+ *
+ * `left` comes from `unitSpanToLeft`, so the box mirrors with the time axis in RTL.
+ */
+export function getActivityRect({
+  activity,
+  rowY,
+  unitWidth,
+  totalUnits,
+  isRtl,
   rowSpan = 1,
   rowHeight = 40,
-): Rect {
-  if (activity.isMilestone) {
-    const cx = activity.startMonth * monthWidth + monthWidth / 2;
-    const cy = rowY + rowHeight / 2;
-    const size = Math.round(rowHeight * 0.55);
-    return {
-      left: cx - size / 2,
-      top: cy - size / 2,
-      width: size,
-      height: size,
-    };
-  }
-  const spanHeight = rowHeight * rowSpan - 8;
+}: ActivityRectInput): Rect {
+  const units = activity.isMilestone ? 1 : activity.durationMonths;
+  const span = activity.isMilestone ? 1 : rowSpan;
+  // A sub-unit bar still has to be grabbable, so its drawn width has a floor.
+  const width = Math.max(units * unitWidth, unitWidth * 0.5);
   return {
-    left: activity.startMonth * monthWidth,
+    left: unitSpanToLeft(activity.startMonth, width / unitWidth, unitWidth, totalUnits, isRtl),
     top: rowY + BAR_PADDING_TOP,
-    width: Math.max(activity.durationMonths * monthWidth, monthWidth * 0.5),
-    height: spanHeight,
+    width,
+    height: rowHeight * span - 8,
   };
 }
 

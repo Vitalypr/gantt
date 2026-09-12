@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useStore } from '@/stores';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import type { RowLayout } from '@/components/GanttChart/GanttChart';
+import { useLatest } from '@/hooks/useLatest';
 
 const DRAG_THRESHOLD = 4;
 
@@ -17,17 +18,14 @@ export type DragRowSpanState = {
 export function useDragRowSpan(rows: RowLayout[]) {
   const rowSize = useStore((s) => s.rowSize);
   const rowHeight = ROW_SIZE_MAP[rowSize];
-  const updateActivity = useStore((s) => s.updateActivity);
-  const reParentActivity = useStore((s) => s.reParentActivity);
+  const setActivityRowSpan = useStore((s) => s.setActivityRowSpan);
   const [dragState, setDragState] = useState<DragRowSpanState>(null);
   const startYRef = useRef(0);
   const isDraggingRef = useRef(false);
   const dragStateRef = useRef<DragRowSpanState>(null);
 
-  const rowsRef = useRef(rows);
-  rowsRef.current = rows;
-  const rowHeightRef = useRef(rowHeight);
-  rowHeightRef.current = rowHeight;
+  const rowsRef = useLatest(rows);
+  const rowHeightRef = useLatest(rowHeight);
 
   const updateDragState = (next: DragRowSpanState) => {
     dragStateRef.current = next;
@@ -110,15 +108,11 @@ export function useDragRowSpan(rows: RowLayout[]) {
           if (prev) {
             const changed = prev.currentRowSpan !== prev.originalRowSpan || prev.topOffset !== 0;
             if (changed) {
-              updateActivity(prev.activityId, { rowSpan: prev.currentRowSpan });
-              // Re-parent if top offset changed
-              if (prev.topOffset !== 0) {
-                const targetIndex = rowIndex + (prev.direction === 'top' ? -prev.topOffset : 0);
-                const targetRow = sortedRows[targetIndex];
-                if (targetRow) {
-                  reParentActivity(prev.activityId, targetRow.rowId);
-                }
-              }
+              // ONE commit for span + row. Two calls cost two Ctrl+Z presses and pass
+              // through a state the user never saw.
+              const targetIndex = rowIndex + (prev.direction === 'top' ? -prev.topOffset : 0);
+              const targetRow = prev.topOffset !== 0 ? sortedRows[targetIndex] : undefined;
+              setActivityRowSpan(prev.activityId, prev.currentRowSpan, targetRow?.rowId);
             }
           }
         } else {
@@ -131,7 +125,7 @@ export function useDragRowSpan(rows: RowLayout[]) {
       target.onpointermove = handlePointerMove;
       target.onpointerup = handlePointerUp;
     },
-    [updateActivity, reParentActivity],
+    [setActivityRowSpan],
   );
 
   return { onPointerDown, dragState };

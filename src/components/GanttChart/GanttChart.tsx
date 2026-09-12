@@ -3,8 +3,17 @@ import { useStore } from '@/stores';
 import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { getTotalMonths, getTotalWeeks } from '@/utils/timeline';
+import { bodyHeightFor, getHeaderHeight } from '@/utils/layout';
+import { resolveRowGroups } from '@/utils/rowGroups';
+import { useChartDirection } from '@/hooks/useChartDirection';
+import { useAnchoredZoom } from '@/hooks/useAnchoredZoom';
 import { TimelineHeader } from '@/components/Timeline/TimelineHeader';
 import { TimelineGrid } from '@/components/Timeline/TimelineGrid';
+import { HolidayLayer } from '@/components/Timeline/HolidayLayer';
+import { MarkerLayer } from '@/components/Timeline/MarkerLayer';
+import { LegendPanel } from '@/components/Timeline/LegendPanel';
+import { AlignmentGuides } from '@/components/Timeline/AlignmentGuides';
+import { RollupBars } from '@/components/Timeline/RollupBars';
 import { TimelineBody } from '@/components/Timeline/TimelineBody';
 import { TodayMarker } from '@/components/Timeline/TodayMarker';
 import { Sidebar } from '@/components/Sidebar/Sidebar';
@@ -16,12 +25,15 @@ import { useDragConnect } from '@/hooks/useDragConnect';
 import { useResizeSidebar } from '@/hooks/useResizeSidebar';
 import { DependencyLayer } from '@/components/DependencyArrows/DependencyLayer';
 import { Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export type RowLayout = {
   rowId: string;
   activityIds: string[];
   y: number;
   mergedWithNext?: boolean;
+  isGroup?: boolean;
+  collapsed?: boolean;
 };
 
 export function GanttChart() {
@@ -36,10 +48,12 @@ export function GanttChart() {
   const endYear = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.endYear : s.chart.endYear);
   const endMonth = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.endMonth : s.chart.endMonth);
   const chartRows = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.rows : s.chart.rows);
+  const chartActivities = useStore((s) => s.timelineMode === 'weeks' ? s.weeksChart.activities : s.chart.activities);
   const addRow = useStore((s) => s.addRow);
   const setEffectiveMonthWidth = useStore((s) => s.setEffectiveMonthWidth);
   const setEffectiveWeekWidth = useStore((s) => s.setEffectiveWeekWidth);
 
+  const { isRtl } = useChartDirection();
   const checkSidebarDoubleTap = useDoubleTap();
   const dragCreate = useDragCreate();
   const dragMove = useDragMove();
@@ -80,144 +94,223 @@ export function GanttChart() {
   }, [effectiveUnitWidth, timelineMode, setEffectiveMonthWidth, setEffectiveWeekWidth]);
 
   const timelineWidth = totalUnits * effectiveUnitWidth;
+  const { zoomAt } = useAnchoredZoom(scrollRef, effectiveUnitWidth);
 
   const dependencyMode = useStore((s) => s.dependencyMode);
   const showQuarters = useStore((s) => s.showQuarters);
   const rowSize = useStore((s) => s.rowSize);
   const rowHeight = ROW_SIZE_MAP[rowSize];
 
+  // A collapsed group hides its member rows, so layout runs over the VISIBLE set. Every
+  // consumer (sidebar, body, arrows, guides) reads this one list, which is what keeps the
+  // sidebar and the canvas from disagreeing about which rows exist.
+  const { visible: visibleRows, rollups } = useMemo(
+    () => resolveRowGroups(chartRows, chartActivities),
+    [chartRows, chartActivities],
+  );
+
   const rowLayout = useMemo(() => {
     const rows: RowLayout[] = [];
     let y = 0;
-    const sorted = [...chartRows].sort((a, b) => a.order - b.order);
-    for (const row of sorted) {
+    for (const row of visibleRows) {
       rows.push({
         rowId: row.id,
         activityIds: row.activityIds,
         y,
         mergedWithNext: row.mergedWithNext,
+        isGroup: row.isGroup,
+        collapsed: row.collapsed,
       });
       y += rowHeight;
     }
     return { rows, totalHeight: y };
-  }, [chartRows, rowHeight]);
+  }, [visibleRows, rowHeight]);
   const dragRowSpan = useDragRowSpan(rowLayout.rows);
   const dragConnect = useDragConnect(rowLayout.rows, effectiveUnitWidth);
 
-  const TIER_HEIGHT = 28;
-  const headerHeight = timelineMode === 'months' && showQuarters ? TIER_HEIGHT * 3 : TIER_HEIGHT * 2;
-  const bodyHeight = Math.max(rowLayout.totalHeight, 300);
+  const headerHeight = getHeaderHeight(timelineMode, showQuarters);
+  const bodyHeight = bodyHeightFor(rowLayout.totalHeight);
   const hasRows = chartRows.length > 0;
+
+  // The grid has four cells. Their DOM order decides which track each lands in, so the order
+  // and the track order are swapped together, in one place.
+  const cornerCell = (
+    <div
+      key="corner"
+      className={cn(
+        'sticky top-0 z-30 border-b bg-background',
+        isRtl ? 'right-0 border-l' : 'left-0 border-r',
+      )}
+      style={{ width: sidebarWidth, height: headerHeight }}
+    />
+  );
+
+  const headerCell = (
+    <div key="header" className="sticky top-0 z-20">
+      <TimelineHeader
+        startYear={startYear}
+        endYear={endYear}
+        chartStartMonth={startMonth}
+        chartEndMonth={endMonth}
+        unitWidth={effectiveUnitWidth}
+        totalWidth={timelineWidth}
+        showQuarters={showQuarters}
+        timelineMode={timelineMode}
+      />
+    </div>
+  );
+
+  const sidebarCell = (
+    <div
+      key="sidebar"
+      className={cn(
+        'sticky z-10 bg-background',
+        isRtl ? 'right-0 border-l' : 'left-0 border-r',
+      )}
+      onDoubleClick={(e) => {
+        // Double-click on empty sidebar area adds a new row
+        if (!(e.target as HTMLElement).closest('[data-sidebar-row]')) {
+          addRow();
+        }
+      }}
+      onPointerDown={(e) => {
+        // Touch/pen only — a mouse is served by onDoubleClick above, and running both
+        // adds two rows for any double-click faster than DOUBLE_TAP_DELAY.
+        if ((e.target as HTMLElement).closest('[data-sidebar-row]')) return;
+        if (checkSidebarDoubleTap(e)) {
+          addRow();
+        }
+      }}
+    >
+      <Sidebar
+        rows={rowLayout.rows}
+        sidebarWidth={sidebarWidth}
+        onResizePointerDown={resizeSidebar.onPointerDown}
+      />
+    </div>
+  );
+
+  const bodyCell = (
+    <div key="body" className="relative" data-timeline-body style={{ height: bodyHeight }}>
+      <TimelineGrid
+        totalUnits={totalUnits}
+        unitWidth={effectiveUnitWidth}
+        rows={rowLayout.rows}
+        totalHeight={bodyHeight}
+        chartStartMonth={startMonth}
+        startYear={startYear}
+        endYear={endYear}
+        endMonth={endMonth}
+        timelineMode={timelineMode}
+      />
+      <HolidayLayer
+        startYear={startYear}
+        startMonth={startMonth}
+        endYear={endYear}
+        endMonth={endMonth}
+        unitWidth={effectiveUnitWidth}
+        totalUnits={totalUnits}
+        totalHeight={bodyHeight}
+        timelineMode={timelineMode}
+      />
+      <TodayMarker
+        startYear={startYear}
+        chartStartMonth={startMonth}
+        unitWidth={effectiveUnitWidth}
+        totalUnits={totalUnits}
+        totalHeight={rowLayout.totalHeight}
+        timelineMode={timelineMode}
+      />
+      <MarkerLayer
+        startYear={startYear}
+        startMonth={startMonth}
+        unitWidth={effectiveUnitWidth}
+        totalUnits={totalUnits}
+        totalHeight={bodyHeight}
+        timelineMode={timelineMode}
+      />
+      <TimelineBody
+        rows={rowLayout.rows}
+        monthWidth={effectiveUnitWidth}
+        totalUnits={totalUnits}
+        dragCreate={dragCreate}
+        dragMove={dragMove}
+        dragResize={dragResize}
+        dragRowSpan={dragRowSpan}
+        onAnchorPointerDown={dependencyMode ? dragConnect.onAnchorPointerDown : undefined}
+      />
+      {/* Mounted unconditionally: `snapshotGantt` rasterises the live DOM, so a layer that
+          only exists in connect mode is a layer missing from every exported image. It is
+          pointer-events:none, so mounting it always is behaviourally inert. */}
+      <DependencyLayer
+        rows={rowLayout.rows}
+        monthWidth={effectiveUnitWidth}
+        totalUnits={totalUnits}
+        timelineWidth={timelineWidth}
+        bodyHeight={bodyHeight}
+        dragConnect={dependencyMode ? dragConnect.dragState : null}
+      />
+
+      <RollupBars
+        rollups={rollups}
+        rows={rowLayout.rows}
+        unitWidth={effectiveUnitWidth}
+        totalUnits={totalUnits}
+        rowHeight={rowHeight}
+      />
+
+      <AlignmentGuides
+        units={dragMove.dragState?.guides ?? []}
+        unitWidth={effectiveUnitWidth}
+        totalUnits={totalUnits}
+        totalHeight={bodyHeight}
+      />
+
+      <LegendPanel />
+
+      {/* Empty state */}
+      {!hasRows && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="pointer-events-auto text-center text-muted-foreground">
+            <Plus className="mx-auto mb-2 h-8 w-8 opacity-40" />
+            <p className="text-sm">Add a row to get started</p>
+            <p className="text-xs opacity-60">Use the + button in the toolbar</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div
       ref={scrollRef}
       data-gantt-scroll
       className="h-full overflow-auto"
+      onWheel={(e) => {
+        // Ctrl/Cmd + wheel is the universal zoom gesture, and it is also what a trackpad
+        // pinch reports. Anchored at the pointer so the chart does not slide away.
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault();
+        zoomAt(e.deltaY < 0 ? 1 : -1, e.clientX);
+      }}
     >
       <div
         className="grid"
         data-gantt-grid
         style={{
-          gridTemplateColumns: `${sidebarWidth}px ${timelineWidth}px`,
+          // Track order and DOM child order are swapped together. Deliberately NOT
+          // `direction: rtl` on the grid — that inherits into the timeline and inverts the
+          // scroll origin — and deliberately not `gridColumn` on the children, because
+          // sparse auto-placement would spill them into extra rows.
+          gridTemplateColumns: isRtl
+            ? `${timelineWidth}px ${sidebarWidth}px`
+            : `${sidebarWidth}px ${timelineWidth}px`,
           gridTemplateRows: `${headerHeight}px ${bodyHeight}px`,
         }}
       >
-        {/* Top-left corner: sticky top + left */}
-        <div
-          className="sticky left-0 top-0 z-30 border-b border-r bg-background"
-          style={{ width: sidebarWidth, height: headerHeight }}
-        />
-
-        {/* Timeline header: sticky top */}
-        <div className="sticky top-0 z-20">
-          <TimelineHeader
-            startYear={startYear}
-            endYear={endYear}
-            chartStartMonth={startMonth}
-            chartEndMonth={endMonth}
-            unitWidth={effectiveUnitWidth}
-            totalWidth={timelineWidth}
-            showQuarters={showQuarters}
-            timelineMode={timelineMode}
-          />
-        </div>
-
-        {/* Sidebar: sticky left */}
-        <div
-          className="sticky left-0 z-10 border-r bg-background"
-          onDoubleClick={(e) => {
-            // Double-click on empty sidebar area adds a new row
-            if (!(e.target as HTMLElement).closest('[data-sidebar-row]')) {
-              addRow();
-            }
-          }}
-          onPointerDown={(e) => {
-            // Double-tap detection for touch (dblclick doesn't fire on touch)
-            if ((e.target as HTMLElement).closest('[data-sidebar-row]')) return;
-            if (checkSidebarDoubleTap(e)) {
-              addRow();
-            }
-          }}
-        >
-          <Sidebar
-            rows={rowLayout.rows}
-            sidebarWidth={sidebarWidth}
-            onResizePointerDown={resizeSidebar.onPointerDown}
-          />
-        </div>
-
-        {/* Timeline body */}
-        <div className="relative" data-timeline-body style={{ height: bodyHeight }}>
-          <TimelineGrid
-            totalUnits={totalUnits}
-            unitWidth={effectiveUnitWidth}
-            rows={rowLayout.rows}
-            totalHeight={bodyHeight}
-            chartStartMonth={startMonth}
-            startYear={startYear}
-            endYear={endYear}
-            endMonth={endMonth}
-            timelineMode={timelineMode}
-          />
-          <TodayMarker
-            startYear={startYear}
-            chartStartMonth={startMonth}
-            unitWidth={effectiveUnitWidth}
-            totalHeight={rowLayout.totalHeight}
-            timelineMode={timelineMode}
-          />
-          <TimelineBody
-            rows={rowLayout.rows}
-            monthWidth={effectiveUnitWidth}
-            sidebarWidth={sidebarWidth}
-            dragCreate={dragCreate}
-            dragMove={dragMove}
-            dragResize={dragResize}
-            dragRowSpan={dragRowSpan}
-            onAnchorPointerDown={dependencyMode ? dragConnect.onAnchorPointerDown : undefined}
-          />
-          {dependencyMode && (
-            <DependencyLayer
-              rows={rowLayout.rows}
-              monthWidth={effectiveUnitWidth}
-              timelineWidth={timelineWidth}
-              bodyHeight={bodyHeight}
-              dragConnect={dragConnect.dragState}
-            />
-          )}
-
-          {/* Empty state */}
-          {!hasRows && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="pointer-events-auto text-center text-muted-foreground">
-                <Plus className="mx-auto mb-2 h-8 w-8 opacity-40" />
-                <p className="text-sm">Add a row to get started</p>
-                <p className="text-xs opacity-60">Use the + button in the toolbar</p>
-              </div>
-            </div>
-          )}
-        </div>
+        {isRtl
+          ? [headerCell, cornerCell, bodyCell, sidebarCell]
+          : [cornerCell, headerCell, sidebarCell, bodyCell]}
       </div>
     </div>
   );

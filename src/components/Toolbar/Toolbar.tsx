@@ -17,20 +17,42 @@ import {
   Sun,
   Moon,
   Rows3,
+  Printer,
+  Flag,
+  MoreHorizontal,
+  LayoutTemplate,
+  List,
+  FileImage,
+  ArrowLeftRight,
+  AArrowDown,
+  AArrowUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useStore } from '@/stores';
-import { useUndo, useRedo } from '@/stores/hooks';
-import { MIN_MONTH_WIDTH, MAX_MONTH_WIDTH, MIN_WEEK_WIDTH, MAX_WEEK_WIDTH } from '@/constants/timeline';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useUndo, useRedo, useCanUndo, useCanRedo } from '@/stores/hooks';
+import { MIN_MONTH_WIDTH, MAX_MONTH_WIDTH, MIN_WEEK_WIDTH, MAX_WEEK_WIDTH, FONT_SIZE_STEPS, stepFontSize } from '@/constants/timeline';
+import { effectiveFontSize } from '@/utils/activity';
 import { MONTH_NAMES_SHORT } from '@/constants/timeline';
 import { getTotalMonths, getTotalWeeks } from '@/utils/timeline';
 import { SaveDialog } from '@/components/Dialogs/SaveDialog';
 import { AddRowDialog } from '@/components/Dialogs/AddRowDialog';
 import { HelpDialog } from '@/components/Dialogs/HelpDialog';
+import { MarkersDialog } from '@/components/Dialogs/MarkersDialog';
+import { TemplateDialog } from '@/components/Dialogs/TemplateDialog';
 import { useTheme } from '@/hooks/useTheme';
-import { snapshotGantt } from '@/utils/snapshot';
+import { snapshotGantt, snapshotGanttSvg } from '@/utils/snapshot';
+import { Toast, type ToastMessage } from './Toast';
+import { setStorageFailureHandler } from '@/utils/persistence';
+import { useEffect } from 'react';
 
 function ToolbarSeparator() {
   return <div className="mx-1.5 h-5 w-px bg-border" />;
@@ -69,10 +91,46 @@ export function Toolbar() {
 
   const undo = useUndo();
   const redo = useRedo();
+  const canUndo = useCanUndo();
+  const canRedo = useCanRedo();
+
+  // Font size acts on the selected bar. Mirrors the right-click submenu so the two cannot
+  // drift apart — both go through `updateActivity`, so both are one undo entry.
+  const selectedActivityIds = useStore((s) => s.selectedActivityIds);
+  const selectedActivity = useStore((s) => {
+    const first = s.selectedActivityIds[0];
+    if (!first) return null;
+    const chart = s.timelineMode === 'weeks' ? s.weeksChart : s.chart;
+    return chart.activities.find((a) => a.id === first) ?? null;
+  });
+  const updateActivities = useStore((s) => s.updateActivities);
+  const selectedFontSize = selectedActivity ? effectiveFontSize(selectedActivity) : null;
+  const changeFontSize = (direction: 1 | -1) => {
+    if (selectedFontSize === null) return;
+    // Applies to the WHOLE selection in one commit.
+    updateActivities(selectedActivityIds, { fontSize: stepFontSize(selectedFontSize, direction) });
+  };
 
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [addRowDialogOpen, setAddRowDialogOpen] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const [markersDialogOpen, setMarkersDialogOpen] = useState(false);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const showLegend = useStore((s) => s.showLegend);
+  const setShowLegend = useStore((s) => s.setShowLegend);
+  const [toast, setToast] = useState<ToastMessage>(null);
+  const [snapshotting, setSnapshotting] = useState(false);
+  const chartDirection = useStore((s) => s.chartDirection);
+  const toggleChartDirection = useStore((s) => s.toggleChartDirection);
+
+  // A storage write that fails must say so; it used to be an invisible rejection inside a
+  // timer while the user kept editing against storage that had stopped accepting anything.
+  useEffect(() => {
+    setStorageFailureHandler(() =>
+      setToast({ kind: 'error', text: 'Could not save — browser storage is full or blocked.' }),
+    );
+    return () => setStorageFailureHandler(null);
+  }, []);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const { theme, toggleTheme } = useTheme();
 
@@ -118,9 +176,37 @@ export function Toolbar() {
 
   const handleImport = async () => {
     const success = await importChart();
-    if (!success) {
-      alert('Failed to import chart. Please check the file format.');
+    // `importChart` resolves false for a CANCELLED picker too, so this cannot claim failure.
+    if (success) setToast({ kind: 'success', text: 'Chart imported.' });
+  };
+
+  const handleSnapshot = async () => {
+    setSnapshotting(true);
+    try {
+      await snapshotGantt(chartName);
+      setToast({ kind: 'success', text: 'Snapshot saved and copied to the clipboard.' });
+    } catch {
+      setToast({ kind: 'error', text: 'Could not capture the chart.' });
+    } finally {
+      setSnapshotting(false);
     }
+  };
+
+  const handleSnapshotSvg = async () => {
+    setSnapshotting(true);
+    try {
+      await snapshotGanttSvg(chartName);
+      setToast({ kind: 'success', text: 'Vector snapshot saved.' });
+    } catch {
+      setToast({ kind: 'error', text: 'Could not capture the chart.' });
+    } finally {
+      setSnapshotting(false);
+    }
+  };
+
+  const handleSave = () => {
+    saveCurrentChart();
+    setToast({ kind: 'success', text: `Saved “${chartName}”.` });
   };
 
   const handleStartYearChange = (value: string) => {
@@ -161,7 +247,10 @@ export function Toolbar() {
 
   return (
     <TooltipProvider delayDuration={400}>
-      <div className="flex h-11 shrink-0 items-center border-b border-border/60 bg-surface px-3 overflow-x-auto scrollbar-hide">
+      <div
+        data-app-chrome
+        className="flex h-11 shrink-0 items-center border-b border-border/60 bg-surface px-3 overflow-x-auto scrollbar-hide"
+      >
         {/* Brand + Chart name */}
         <div className="flex items-center gap-2.5 mr-1">
           <div className="hidden lg:flex items-center gap-1.5 text-primary">
@@ -171,6 +260,8 @@ export function Toolbar() {
           <div className="hidden lg:block h-4 w-px bg-border" />
           <Input
             ref={nameInputRef}
+            dir="auto"
+            aria-label="Chart name"
             defaultValue={chartName}
             key={`${chartName}-${timelineMode}`}
             onBlur={handleNameBlur}
@@ -209,6 +300,24 @@ export function Toolbar() {
               </div>
             </TooltipTrigger>
             <TooltipContent>Timeline Mode: {timelineMode === 'months' ? 'Months' : 'Weeks'}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={chartDirection === 'rtl' ? 'default' : 'ghost'}
+                size="icon"
+                aria-label="Toggle chart direction"
+                aria-pressed={chartDirection === 'rtl'}
+                className="h-7 w-7"
+                onClick={toggleChartDirection}
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {chartDirection === 'rtl' ? 'Right-to-left (עברית)' : 'Left-to-right'}
+            </TooltipContent>
           </Tooltip>
         </ToolbarGroup>
 
@@ -320,7 +429,7 @@ export function Toolbar() {
         <ToolbarGroup>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomOut} disabled={monthWidth <= minWidth}>
+              <Button variant="ghost" size="icon" aria-label="Zoom out" className="h-7 w-7" onClick={zoomOut} disabled={monthWidth <= minWidth}>
                 <ZoomOut className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -333,7 +442,7 @@ export function Toolbar() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={zoomIn} disabled={monthWidth >= maxWidth}>
+              <Button variant="ghost" size="icon" aria-label="Zoom in" className="h-7 w-7" onClick={zoomIn} disabled={monthWidth >= maxWidth}>
                 <ZoomIn className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -346,7 +455,7 @@ export function Toolbar() {
         {/* Fit to view */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={fitToView}>
+            <Button variant="ghost" size="icon" aria-label="Fit chart to view" className="h-7 w-7" onClick={fitToView}>
               <Maximize2 className="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
@@ -360,7 +469,9 @@ export function Toolbar() {
               <Button
                 variant={showQuarters ? 'default' : 'ghost'}
                 size="icon"
-                className="h-7 w-7 text-[11px] font-bold"
+                aria-label="Toggle quarter row"
+                aria-pressed={showQuarters}
+                className="h-7 w-7 text-meta font-bold"
                 onClick={() => setShowQuarters(!showQuarters)}
               >
                 Qr
@@ -376,6 +487,7 @@ export function Toolbar() {
             <Button
               variant="ghost"
               size="icon"
+              aria-label={`Row height: ${rowSize}`}
               className="h-7 w-7"
               onClick={() => {
                 const next = rowSize === 'small' ? 'medium' : rowSize === 'medium' ? 'large' : 'small';
@@ -390,13 +502,59 @@ export function Toolbar() {
 
         <ToolbarSeparator />
 
+        {/* Font size for the selected bar */}
+        <ToolbarGroup>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Decrease label font size"
+                className="h-7 w-7"
+                onClick={() => changeFontSize(-1)}
+                disabled={selectedFontSize === null || selectedFontSize <= FONT_SIZE_STEPS[0]!}
+              >
+                <AArrowDown className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {selectedActivity ? `Smaller Label (${selectedFontSize}px)` : 'Select a bar to resize its label'}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Increase label font size"
+                className="h-7 w-7"
+                onClick={() => changeFontSize(1)}
+                disabled={
+                  selectedFontSize === null ||
+                  selectedFontSize >= FONT_SIZE_STEPS[FONT_SIZE_STEPS.length - 1]!
+                }
+              >
+                <AArrowUp className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {selectedActivity ? `Larger Label (${selectedFontSize}px)` : 'Select a bar to resize its label'}
+            </TooltipContent>
+          </Tooltip>
+        </ToolbarGroup>
+
+        <ToolbarSeparator />
+
         {/* Dependency mode toggle */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant={dependencyMode ? 'default' : 'ghost'}
               size="sm"
-              className="h-7 gap-1.5 px-1.5 lg:px-2.5 text-xs font-medium"
+              aria-label="Toggle dependency mode"
+              aria-pressed={dependencyMode}
+              className="h-7 gap-1.5 px-1.5 lg:px-2.5 text-label font-medium"
               onClick={() => setDependencyMode(!dependencyMode)}
             >
               <Waypoints className="h-3.5 w-3.5" />
@@ -412,7 +570,7 @@ export function Toolbar() {
         <ToolbarGroup>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={undo}>
+              <Button variant="ghost" size="icon" aria-label="Undo" className="h-7 w-7" onClick={undo} disabled={!canUndo}>
                 <Undo2 className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -421,7 +579,7 @@ export function Toolbar() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={redo}>
+              <Button variant="ghost" size="icon" aria-label="Redo" className="h-7 w-7" onClick={redo} disabled={!canRedo}>
                 <Redo2 className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -435,7 +593,7 @@ export function Toolbar() {
         <ToolbarGroup>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={saveCurrentChart}>
+              <Button variant="ghost" size="icon" aria-label="Save chart" className="h-7 w-7" onClick={handleSave}>
                 <Save className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -444,66 +602,92 @@ export function Toolbar() {
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSaveDialogOpen(true)}>
+              <Button variant="ghost" size="icon" aria-label="Open saved charts" className="h-7 w-7" onClick={() => setSaveDialogOpen(true)}>
                 <FolderOpen className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Open Saved Charts</TooltipContent>
           </Tooltip>
 
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={exportChart}>
-                <Download className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Export JSON</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleImport}>
-                <Upload className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Import JSON</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => snapshotGantt(chartName)}>
-                <Camera className="h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Snapshot (JPEG)</TooltipContent>
-          </Tooltip>
         </ToolbarGroup>
+
+        <ToolbarSeparator />
+
+        {/* Everything below is used rarely; it lives behind one affordance instead of
+            extending a strip that already scrolled out of reach with no scrollbar. */}
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="More actions" className="h-7 w-7">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>More: export, import, snapshots, print</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => setShowLegend(!showLegend)}>
+              <List className="mr-2 h-3.5 w-3.5" />
+              {showLegend ? 'Hide legend' : 'Show legend'}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="my-1 h-px bg-border" />
+            <DropdownMenuItem onSelect={() => setTemplateDialogOpen(true)}>
+              <LayoutTemplate className="mr-2 h-3.5 w-3.5" />
+              Start from a template…
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="my-1 h-px bg-border" />
+            <DropdownMenuItem onSelect={() => void exportChart()}>
+              <Download className="mr-2 h-3.5 w-3.5" />
+              Export JSON
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void handleImport()}>
+              <Upload className="mr-2 h-3.5 w-3.5" />
+              Import JSON
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="my-1 h-px bg-border" />
+            <DropdownMenuItem disabled={snapshotting} onSelect={() => void handleSnapshot()}>
+              <Camera className="mr-2 h-3.5 w-3.5" />
+              Snapshot (JPEG)
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={snapshotting} onSelect={() => void handleSnapshotSvg()}>
+              <FileImage className="mr-2 h-3.5 w-3.5" />
+              Snapshot (SVG)
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => window.print()}>
+              <Printer className="mr-2 h-3.5 w-3.5" />
+              Print / Save as PDF
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="my-1 h-px bg-border" />
+            <DropdownMenuItem onSelect={() => setMarkersDialogOpen(true)}>
+              <Flag className="mr-2 h-3.5 w-3.5" />
+              Markers…
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setHelpDialogOpen(true)}>
+              <HelpCircle className="mr-2 h-3.5 w-3.5" />
+              Help
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <ToolbarSeparator />
 
         {/* Theme toggle */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={toggleTheme}>
+            <Button variant="ghost" size="icon" aria-label="Toggle theme" className="h-7 w-7" onClick={toggleTheme}>
               {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
             </Button>
           </TooltipTrigger>
           <TooltipContent>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</TooltipContent>
         </Tooltip>
 
-        {/* Help */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setHelpDialogOpen(true)}>
-              <HelpCircle className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Help Guide</TooltipContent>
-        </Tooltip>
-
         <SaveDialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen} />
         <AddRowDialog open={addRowDialogOpen} onOpenChange={setAddRowDialogOpen} />
         <HelpDialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen} />
+        <MarkersDialog open={markersDialogOpen} onOpenChange={setMarkersDialogOpen} />
+        <TemplateDialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen} />
+        <Toast message={toast} onDismiss={() => setToast(null)} />
       </div>
     </TooltipProvider>
   );

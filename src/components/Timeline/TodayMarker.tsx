@@ -1,21 +1,25 @@
-import { getCurrentMonthIndex, getCurrentWeekIndex } from '@/utils/timeline';
+import { getCurrentMonthIndex, getCurrentWeekIndex, unitSpanToLeft } from '@/utils/timeline';
 import type { TimelineMode } from '@/types/gantt';
+import { useChartDirection } from '@/hooks/useChartDirection';
 
 type TodayMarkerProps = {
   startYear: number;
   chartStartMonth?: number;
   unitWidth: number;
+  totalUnits: number;
   totalHeight: number;
   timelineMode: TimelineMode;
 };
 
-export function TodayMarker({ startYear, chartStartMonth = 1, unitWidth, totalHeight, timelineMode }: TodayMarkerProps) {
-  let x: number;
+export function TodayMarker({ startYear, chartStartMonth = 1, unitWidth, totalUnits, totalHeight, timelineMode }: TodayMarkerProps) {
+  const { isRtl } = useChartDirection();
+  // Fractional unit offset of "now"; mirrored through the same choke point as the bars.
+  let unitOffset: number;
 
   if (timelineMode === 'weeks') {
     const weekIndex = getCurrentWeekIndex(startYear, chartStartMonth);
-    if (weekIndex < 0) return null;
-    x = weekIndex * unitWidth;
+    if (weekIndex < 0 || weekIndex > totalUnits) return null;
+    unitOffset = weekIndex;
   } else {
     const todayIndex = getCurrentMonthIndex(startYear, chartStartMonth);
     if (todayIndex < 0) return null;
@@ -24,8 +28,12 @@ export function TodayMarker({ startYear, chartStartMonth = 1, unitWidth, totalHe
     const dayOfMonth = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const fractionOfMonth = (dayOfMonth - 1) / daysInMonth;
-    x = todayIndex * unitWidth + fractionOfMonth * unitWidth;
+    if (todayIndex > totalUnits) return null;
+    unitOffset = todayIndex + fractionOfMonth;
   }
+
+  // Zero-width span: the marker is a line at an instant, not a column.
+  const x = unitSpanToLeft(unitOffset, 0, unitWidth, totalUnits, isRtl);
 
   return (
     <div

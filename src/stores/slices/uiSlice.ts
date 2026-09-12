@@ -9,7 +9,7 @@ import {
   MAX_WEEK_WIDTH,
   ZOOM_STEP,
 } from '@/constants/timeline';
-import type { TimelineMode } from '@/types/gantt';
+import type { ChartDirection, TimelineMode } from '@/types/gantt';
 
 export type SelectedActivity = {
   activityId: string;
@@ -31,13 +31,19 @@ export type UiSlice = {
   weekWidth: number;
   effectiveWeekWidth: number;
   sidebarWidth: number;
-  selectedActivity: SelectedActivity | null;
+  /** Selection is a SET: bulk recolour, bulk delete and range select all need more than
+   *  one. Order is selection order, so the first entry is the anchor. */
+  selectedActivityIds: string[];
   editingActivity: EditingActivity | null;
   selectedDependency: SelectedDependency | null;
   dependencyMode: boolean;
   showQuarters: boolean;
   rowSize: RowSize;
   timelineMode: TimelineMode;
+  chartDirection: ChartDirection;
+  /** Find-in-chart query; null means the panel is closed. */
+  findQuery: string | null;
+  showLegend: boolean;
 
   zoomIn: () => void;
   zoomOut: () => void;
@@ -47,12 +53,18 @@ export type UiSlice = {
   setEffectiveWeekWidth: (width: number) => void;
   setSidebarWidth: (width: number) => void;
   selectActivity: (selection: SelectedActivity | null) => void;
+  toggleActivitySelection: (activityId: string) => void;
+  selectActivities: (activityIds: string[]) => void;
   setEditingActivity: (editing: EditingActivity | null) => void;
   selectDependency: (selection: SelectedDependency | null) => void;
   setDependencyMode: (enabled: boolean) => void;
   setShowQuarters: (show: boolean) => void;
   setRowSize: (size: RowSize) => void;
   setTimelineMode: (mode: TimelineMode) => void;
+  setChartDirection: (direction: ChartDirection) => void;
+  toggleChartDirection: () => void;
+  setFindQuery: (query: string | null) => void;
+  setShowLegend: (show: boolean) => void;
 };
 
 export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []> = (set) => ({
@@ -61,13 +73,16 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   weekWidth: DEFAULT_WEEK_WIDTH,
   effectiveWeekWidth: DEFAULT_WEEK_WIDTH,
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
-  selectedActivity: null,
+  selectedActivityIds: [],
   editingActivity: null,
   selectedDependency: null,
   dependencyMode: false,
   showQuarters: true,
   rowSize: 'medium' as RowSize,
   timelineMode: 'months' as TimelineMode,
+  chartDirection: 'ltr' as ChartDirection,
+  findQuery: null as string | null,
+  showLegend: false,
 
   zoomIn: () =>
     set((state) => {
@@ -118,8 +133,25 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
 
   selectActivity: (selection) =>
     set((state) => {
-      state.selectedActivity = selection;
+      state.selectedActivityIds = selection ? [selection.activityId] : [];
       if (selection) state.selectedDependency = null;
+    }),
+
+  toggleActivitySelection: (activityId) =>
+    set((state) => {
+      const i = state.selectedActivityIds.indexOf(activityId);
+      if (i >= 0) {
+        state.selectedActivityIds.splice(i, 1);
+      } else {
+        state.selectedActivityIds.push(activityId);
+        state.selectedDependency = null;
+      }
+    }),
+
+  selectActivities: (activityIds) =>
+    set((state) => {
+      state.selectedActivityIds = [...new Set(activityIds)];
+      if (state.selectedActivityIds.length > 0) state.selectedDependency = null;
     }),
 
   setEditingActivity: (editing) =>
@@ -131,7 +163,7 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
     set((state) => {
       state.selectedDependency = selection;
       if (selection) {
-        state.selectedActivity = null;
+        state.selectedActivityIds = [];
         state.editingActivity = null;
       }
     }),
@@ -151,11 +183,31 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
       state.rowSize = size;
     }),
 
+  setShowLegend: (show) =>
+    set((state) => {
+      state.showLegend = show;
+    }),
+
+  setFindQuery: (query) =>
+    set((state) => {
+      state.findQuery = query;
+    }),
+
+  setChartDirection: (direction) =>
+    set((state) => {
+      state.chartDirection = direction;
+    }),
+
+  toggleChartDirection: () =>
+    set((state) => {
+      state.chartDirection = state.chartDirection === 'rtl' ? 'ltr' : 'rtl';
+    }),
+
   setTimelineMode: (mode) =>
     set((state) => {
       state.timelineMode = mode;
       // Clear selection when switching modes
-      state.selectedActivity = null;
+      state.selectedActivityIds = [];
       state.editingActivity = null;
       state.selectedDependency = null;
     }),

@@ -1,2 +1,5 @@
-ignoredBuiltDependencies:
-  - esbuild
+# esbuild's postinstall fetches its platform binary. Left unapproved, `pnpm install`
+# exits non-zero with ERR_PNPM_IGNORED_BUILDS and CI treats the install as failed.
+# The shipped file had the placeholder `esbuild: set this to true or false` here.
+allowBuilds:
+  esbuild: true

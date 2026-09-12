@@ -1,4 +1,5 @@
-import { Trash2, FileText } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, FileText, Check, X, CalendarRange, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,6 +23,7 @@ export function SaveDialog({ open, onOpenChange }: SaveDialogProps) {
 
   const handleOpen = (open: boolean) => {
     if (open) refreshSavedCharts();
+    setConfirmingId(null);
     onOpenChange(open);
   };
 
@@ -30,8 +32,13 @@ export function SaveDialog({ open, onOpenChange }: SaveDialogProps) {
     onOpenChange(false);
   };
 
+  // Two-step, because deleting a named save is permanent, outside undo history, and its
+  // button sits 24px from the row's own click-to-load target.
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+
   const handleDelete = (id: string) => {
     deleteSavedChart(id);
+    setConfirmingId(null);
   };
 
   return (
@@ -52,22 +59,57 @@ export function SaveDialog({ open, onOpenChange }: SaveDialogProps) {
               >
                 <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <button
-                  className="flex-1 text-left text-sm hover:underline"
+                  dir="auto"
+                  className="flex-1 truncate text-left text-label hover:underline"
+                  title={entry.name}
                   onClick={() => handleLoad(entry.id)}
                 >
                   {entry.name}
                 </button>
-                <span className="text-xs text-muted-foreground">
+                {/* Which chart this save came from — the two are indistinguishable by name. */}
+                <span
+                  className="shrink-0 text-muted-foreground"
+                  title={entry.mode === 'weeks' ? 'Weeks chart' : 'Months chart'}
+                >
+                  {entry.mode === 'weeks'
+                    ? <CalendarDays className="h-3.5 w-3.5" />
+                    : <CalendarRange className="h-3.5 w-3.5" />}
+                </span>
+                <span className="shrink-0 text-micro text-muted-foreground">
                   {new Date(entry.updatedAt).toLocaleDateString()}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleDelete(entry.id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+                {confirmingId === entry.id ? (
+                  <span className="flex shrink-0 items-center gap-0.5">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Confirm delete ${entry.name}`}
+                      className="h-7 w-7 text-destructive"
+                      onClick={() => handleDelete(entry.id)}
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Cancel delete"
+                      className="h-7 w-7"
+                      onClick={() => setConfirmingId(null)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </span>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Delete ${entry.name}`}
+                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => setConfirmingId(entry.id)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </div>
             ))
           )}

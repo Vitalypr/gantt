@@ -13,6 +13,17 @@ dist-exe
 dist-ssr
 *.local
 
+# The single-file build IS a deliverable, so index.html is tracked and kept current by
+# .githooks/pre-commit. Everything else in dist-single/ is a copy of public/ — ignored,
+# because tracking a second copy of a 190KB JPEG buys nothing.
+dist-single/*
+!dist-single/index.html
+
+# Debugging screenshots and source archives at the repo root. Untracked noise here is
+# exactly why six deleted public/ assets went unnoticed.
+/test-*.png
+/*.zip
+
 # Playwright MCP screenshots
 .playwright-mcp/
 
@@ -32,3 +43,10 @@ nul
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright
+test-results/
+playwright-report/
+
+# Archived artifacts, kept out of the tree but not deleted
+/Old/

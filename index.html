@@ -2,11 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/gantt/favicon.svg" />
+    <!-- Icon hrefs use the base-url placeholder, not a literal path: Vite does not rebase
+         absolute hrefs, so a hardcoded one 404s in the single-file and EXE builds, which
+         are built with a relative base. -->
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1e293b" />
     <meta name="description" content="Interactive Gantt chart for project planning" />
-    <link rel="apple-touch-icon" href="/gantt/icons/apple-touch-icon-180x180.png" />
+    <link rel="apple-touch-icon" href="%BASE_URL%icons/apple-touch-icon-180x180.png" />
     <title>Gantt Chart</title>
   </head>
   <body>
