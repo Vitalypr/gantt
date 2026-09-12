@@ -1,6 +1,7 @@
 import type { Chart, MonthsChart, SavedChartEntry, TimelineMode, WeeksChart, ActivityStatus } from '@/types/gantt';
 import { statusFromLegacyProgress } from '@/utils/activity';
 import { ACTIVITY_STATUSES } from '@/types/gantt';
+import { LABEL_COLOR_CHOICES } from '@/constants/colors';
 import { unitForMode } from '@/types/gantt';
 import { parseViewSettings } from '@/utils/viewSettings';
 
@@ -426,10 +427,16 @@ export function normalizeChart<T extends Chart>(chart: T): T {
     // Validate here, once: past this point every layer trusts the field, and an unknown
     // string would reach the renderer's exhaustive switch and fall through it.
     const known = ACTIVITY_STATUSES.includes(a.status as ActivityStatus) ? a.status : undefined;
+    // Same boundary rule as the status: one of the four offered values or nothing. A free
+    // string here would reach `style={{ color }}` and could render the label invisible.
+    const labelColor = LABEL_COLOR_CHOICES.some((c) => c.value === a.labelColor)
+      ? a.labelColor
+      : undefined;
     const status = known ?? statusFromLegacyProgress(progress) ?? undefined;
     return {
       ...rest,
       status,
+      labelColor,
       startMonth: Math.max(0, Math.round(a.startMonth ?? 0)),
       durationMonths: Math.max(1, Math.round(a.durationMonths ?? 1)),
       rowSpan: a.rowSpan === undefined ? undefined : Math.min(Math.max(1, Math.round(a.rowSpan)), maxSpan),

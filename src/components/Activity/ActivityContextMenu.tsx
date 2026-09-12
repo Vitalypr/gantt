@@ -11,6 +11,7 @@ import {
 import type { Activity, ActivityStatus } from '@/types/gantt';
 import { FONT_SIZE_STEPS, stepFontSize } from '@/constants/timeline';
 import { defaultFontSize, effectiveFontSize, statusFillFraction } from '@/utils/activity';
+import { LABEL_COLOR_CHOICES } from '@/constants/colors';
 import { useStore } from '@/stores';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -107,6 +108,14 @@ export function ActivityContextMenu({
                   onPick: (outlineColor) => updateActivity(activity.id, { outlineColor }),
                   onReset: () => updateActivity(activity.id, { outlineColor: undefined }),
                   resetLabel: 'Default (grey)',
+                },
+                {
+                  label: 'Text',
+                  current: activity.labelColor,
+                  onPick: (labelColor) => updateActivity(activity.id, { labelColor }),
+                  onReset: () => updateActivity(activity.id, { labelColor: undefined }),
+                  resetLabel: 'Automatic',
+                  swatches: LABEL_COLOR_CHOICES,
                 },
               ]}
             />

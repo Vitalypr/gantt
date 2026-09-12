@@ -59,6 +59,21 @@ export const BASE_TONE_COLORS: readonly string[] = ACTIVITY_COLOR_GROUPS.map(
 );
 
 /**
+ * The colours a label may be set to.
+ *
+ * Four, not the full palette: the label is text on a coloured bar, so its job is to be read,
+ * and a hue picked independently of the fill is the fastest way to make it unreadable. Black
+ * is the same value the automatic choice uses, so switching between Automatic and Black on a
+ * light bar changes nothing — which is the point.
+ */
+export const LABEL_COLOR_CHOICES = [
+  { label: 'White', value: '#ffffff' },
+  { label: 'Black', value: '#0f172a' },
+  { label: 'Red', value: '#ef4444' },
+  { label: 'Grey', value: '#64748b' },
+] as const;
+
+/**
  * Teal, not blue.
  *
  * The chrome accent is indigo-500 (`--color-primary`), and a blue-500 default put content a

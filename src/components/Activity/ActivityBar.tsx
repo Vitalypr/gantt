@@ -78,7 +78,8 @@ export function ActivityBar({
   const left = unitSpanToLeft(startMonth, width / monthWidth, monthWidth, totalUnits, isRtl);
 
   const isDark = isColorDark(activity.color);
-  const labelColor = isDark ? '#ffffff' : '#0f172a';
+  // Explicit choice wins; undefined keeps the measured black-or-white that reads on any fill.
+  const labelColor = activity.labelColor ?? (isDark ? '#ffffff' : '#0f172a');
   const fontSize = effectiveFontSize(activity);
   // Undefined means "follow the theme": a frozen literal would not re-theme in dark mode.
   const frameColor = activity.outlineColor ?? 'var(--color-bar-outline)';

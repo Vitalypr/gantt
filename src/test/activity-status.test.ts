@@ -10,7 +10,7 @@ import {
   STATUS_RAIL_RESERVE,
 } from '@/constants/timeline';
 import { ACTIVITY_STATUSES } from '@/types/gantt';
-import { ALL_ACTIVITY_COLORS } from '@/constants/colors';
+import { ALL_ACTIVITY_COLORS, DEFAULT_ACTIVITY_COLOR, LABEL_COLOR_CHOICES } from '@/constants/colors';
 import type { MonthsChart } from '@/types/gantt';
 
 describe('statusFillFraction', () => {
@@ -264,5 +264,49 @@ describe('status validation at ingress', () => {
   it('drops an unknown one rather than letting it reach the renderer', () => {
     expect(normalizeChart(chartWith('shipped')).activities[0]!.status).toBeUndefined();
     expect(normalizeChart(chartWith(42)).activities[0]!.status).toBeUndefined();
+  });
+});
+
+describe('label colour', () => {
+  const chartWith = (labelColor: unknown): MonthsChart => ({
+    id: 'c', unit: 'month', name: 'T',
+    startYear: 2026, startMonth: 1, endYear: 2026, endMonth: 12,
+    rows: [{ id: 'r1', name: '', order: 0, activityIds: ['a1'] }],
+    activities: [
+      { id: 'a1', name: 'A', color: '#14b8a6', startMonth: 0, durationMonths: 2, order: 0, labelColor },
+    ],
+    dependencies: [], createdAt: 'x', updatedAt: 'x',
+  } as unknown as MonthsChart);
+
+  it('offers exactly white, black, red and grey', () => {
+    expect(LABEL_COLOR_CHOICES.map((c) => c.label)).toEqual(['White', 'Black', 'Red', 'Grey']);
+  });
+
+  it('keeps every offered value through an ingress', () => {
+    for (const choice of LABEL_COLOR_CHOICES) {
+      expect(normalizeChart(chartWith(choice.value)).activities[0]!.labelColor).toBe(choice.value);
+    }
+  });
+
+  it('drops anything else rather than letting it reach a style attribute', () => {
+    expect(normalizeChart(chartWith('rebeccapurple')).activities[0]!.labelColor).toBeUndefined();
+    expect(normalizeChart(chartWith(42)).activities[0]!.labelColor).toBeUndefined();
+    expect(normalizeChart(chartWith(undefined)).activities[0]!.labelColor).toBeUndefined();
+  });
+
+  it('reads on the default bar colour', () => {
+    for (const choice of LABEL_COLOR_CHOICES) {
+      const ratio = contrastRatio(choice.value, DEFAULT_ACTIVITY_COLOR);
+      expect(ratio, `${choice.label} scored ${ratio.toFixed(2)}:1 on the default fill`)
+        .toBeGreaterThanOrEqual(1.5);
+    }
+  });
+
+  it('can be set and cleared back to automatic', () => {
+    useStore.getState().setChart(chartWith(undefined));
+    useStore.getState().updateActivity('a1', { labelColor: '#ef4444' });
+    expect(useStore.getState().chart.activities[0]!.labelColor).toBe('#ef4444');
+    useStore.getState().updateActivity('a1', { labelColor: undefined });
+    expect(useStore.getState().chart.activities[0]!.labelColor).toBeUndefined();
   });
 });

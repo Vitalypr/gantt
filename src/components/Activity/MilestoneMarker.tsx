@@ -64,7 +64,7 @@ export function MilestoneMarker({
   const left = unitSpanToLeft(startMonth, 1, monthWidth, totalUnits, isRtl);
 
   const isDark = isColorDark(activity.color);
-  const labelColor = isDark ? '#ffffff' : '#0f172a';
+  const labelColor = activity.labelColor ?? (isDark ? '#ffffff' : '#0f172a');
   const fontSize = effectiveFontSize(activity);
   const frameColor = activity.outlineColor ?? 'var(--color-bar-outline)';
   const mark = showStatus ? activity.status : undefined;

@@ -13,6 +13,9 @@ export type ColorTarget = {
   /** Offer a "follow the theme" reset. Omit for a target that must always have a colour. */
   onReset?: () => void;
   resetLabel?: string;
+  /** A short, named set INSTEAD of the full hue x tone grid. Used by the label colour, where
+   *  the choice is deliberately four readable values rather than a hundred. */
+  swatches?: readonly { label: string; value: string }[];
 };
 
 type ColorPickerProps = {
@@ -76,6 +79,30 @@ export function ColorPicker({ targets, activeIndex, onActiveIndexChange }: Color
         </button>
       )}
 
+      {active.swatches ? (
+        <div className="flex flex-col gap-0.5">
+          {active.swatches.map((s) => (
+            <button
+              key={s.value}
+              aria-label={s.label}
+              className={cn(
+                'flex items-center gap-2 rounded-sm px-1.5 py-1 text-left text-xs',
+                'hover:bg-accent focus-visible:bg-accent',
+                active.current === s.value && 'bg-accent font-medium',
+              )}
+              onClick={() => active.onPick(s.value)}
+            >
+              <span
+                className="h-4 w-4 shrink-0 rounded-sm border border-black/20 dark:border-white/20"
+                style={{ backgroundColor: s.value }}
+              />
+              <span className="flex-1">{s.label}</span>
+              {active.current === s.value && <Check className="h-3 w-3" />}
+            </button>
+          ))}
+        </div>
+      ) : (
+      <>
       {/* ONE grid — hue names, tone headings and swatches all place into the same tracks.
           They were three separate flex stacks whose rows lined up only because their heights
           happened to match; a change to any one of them would have drifted the labels off
@@ -126,6 +153,8 @@ export function ColorPicker({ targets, activeIndex, onActiveIndexChange }: Color
           </Fragment>
         ))}
       </div>
+      </>
+      )}
     </div>
   );
 }

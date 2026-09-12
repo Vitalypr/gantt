@@ -24,6 +24,9 @@ export type Activity = {
   outlineColor?: string;
   /** Label size in px. Undefined means the size-for-kind default. */
   fontSize?: number;
+  /** Label colour. Undefined means "follow the fill" — the measured black-or-white choice
+   *  that keeps the name readable on any swatch. */
+  labelColor?: string;
   /** Delivery state, drawn as a rail inside the bar's bottom edge. Undefined means the
    *  activity is not tracked — the bar renders exactly as it did before the field existed. */
   status?: ActivityStatus;

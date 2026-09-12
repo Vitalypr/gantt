@@ -155,6 +155,7 @@ function applyActivityUpdates(activity: Activity, updates: Partial<Activity>): v
   if ('annotation' in updates) activity.annotation = updates.annotation;
   if ('outlineColor' in updates) activity.outlineColor = updates.outlineColor;
   if ('fontSize' in updates) activity.fontSize = updates.fontSize;
+  if ('labelColor' in updates) activity.labelColor = updates.labelColor;
 }
 
 /** Helper: get the active chart from state (months or weeks) */
