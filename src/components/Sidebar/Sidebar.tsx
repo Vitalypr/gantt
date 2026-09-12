@@ -21,6 +21,7 @@ type Row = {
   isGroup?: boolean;
   collapsed?: boolean;
   gapBefore?: boolean;
+  gapAfter?: boolean;
 };
 
 type SidebarProps = {
@@ -76,9 +77,13 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown, onResizeStep 
                 className={cn(
                   'absolute flex items-center px-3 text-xs',
                   row.isGroup && 'bg-muted/60 font-bold',
-                  // Close the box against a topic band. Without it the band reads as padding
-                  // on top of this row rather than as a break above it.
-                  row.gapBefore && 'border-t border-border-subtle',
+                  // Close the box on whichever side a topic band touches, in the full-strength
+                  // border rather than the row hairline — these two edges are what make the
+                  // band read as a break rather than as space belonging to a row. Listed after
+                  // the merge rules so a merge leader, which drops its bottom border, still
+                  // draws one here.
+                  row.gapBefore && 'border-t border-border',
+                  row.gapAfter && 'border-b border-border',
                   isSelected && 'bg-accent/50 text-foreground',
                   // Hide bottom border for merged leader rows (except the last in group)
                   isMergeLeader && 'border-b-0',

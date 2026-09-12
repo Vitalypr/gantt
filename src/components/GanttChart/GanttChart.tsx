@@ -35,8 +35,9 @@ export type RowLayout = {
   mergedWithNext?: boolean;
   isGroup?: boolean;
   collapsed?: boolean;
-  /** A topic band sits directly above this row, so it closes its box on that side. */
+  /** A topic band sits directly above / below this row, so it closes its box on that side. */
   gapBefore?: boolean;
+  gapAfter?: boolean;
 };
 
 export function GanttChart() {
@@ -158,6 +159,12 @@ export function GanttChart() {
       });
       y += rowHeight;
     }
+    // The row a band opens below is the one that has to close itself on its bottom edge.
+    for (const g of gaps) {
+      const above = rows.filter((r) => r.y + rowHeight <= g.y).pop();
+      if (above) above.gapAfter = true;
+    }
+
     return { rows, gaps, totalHeight: y };
   }, [visibleRows, rowHeight, topics, topicsShown]);
   const dragMove = useDragMove(rowLayout.rows);
