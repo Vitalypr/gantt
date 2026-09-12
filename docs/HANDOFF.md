@@ -82,6 +82,13 @@ kept recurring.
 - **`pnpm-workspace.yaml` needs `allowBuilds: {esbuild: true}`**, not `onlyBuiltDependencies`.
 - **Playwright uses the system Chrome** via `channel: 'chrome'`; CI sets `PLAYWRIGHT_CHANNEL=''`
   to use the bundled browser instead.
+- **A deploy is invisible on the first page-view.** The app is a PWA: the service worker
+  precaches the shell, so after `pnpm deploy:gh` the next visit is served the PREVIOUS build and
+  only the one after that gets the new one. Measured: the live site handed this browser
+  `index-Bt70_8CW.js` — a build from hours earlier — while `index.html` and `sw.js` on the
+  server both referenced the current bundle. `main.tsx` now reloads once on `controllerchange`
+  so the handover happens on the same visit. When checking a deploy by hand, load it twice, or
+  compare the bundle hash the page actually loaded against `curl -s <site> | grep index-`.
 - **`build:exe:web` rebuilds `dist/` with `--base=./`**, leaving it unusable for gh-pages.
   Re-run `pnpm build` afterwards.
 - **Tailwind's sources are declared in `src/index.css`, not auto-detected. Leave them that
