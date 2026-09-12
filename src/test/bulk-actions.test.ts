@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@/stores';
 import type { MonthsChart } from '@/types/gantt';
+import { FORMAT_FIELDS, formatOf, formatDiffers } from '@/utils/activity';
 
 const seed = (): MonthsChart => ({
   id: 'c', unit: 'month', name: 'T', startYear: 2026, startMonth: 1, endYear: 2027, endMonth: 12,
@@ -112,5 +113,77 @@ describe('bulk actions are each one commit', () => {
     st().removeActivities([]);
     st().transformActivities([], { units: 5 });
     expect(temporal().pastStates.length).toBe(before);
+  });
+});
+
+/**
+ * The format painter follows the Office model: pick a format up from one bar, paint it onto
+ * another. What is asserted here is the part that is not the button — which fields travel,
+ * that a paste is a single undo entry, and that arming is a mode outside the chart.
+ */
+describe('format painter', () => {
+  beforeEach(() => {
+    useStore.getState().setChart(seed());
+    useStore.getState().disarmFormatPainter();
+  });
+
+  const source = () => chart().activities.find((a) => a.id === 'a1')!;
+  const target = () => chart().activities.find((a) => a.id === 'a2')!;
+
+  it('carries fill, frame, text colour and font size, and nothing else', () => {
+    expect([...FORMAT_FIELDS]).toEqual(['color', 'outlineColor', 'labelColor', 'fontSize']);
+  });
+
+  it('copies every format field onto the target', () => {
+    st().updateActivity('a1', {
+      color: '#f59e0b', outlineColor: '#ef4444', labelColor: '#ffffff', fontSize: 14,
+    });
+    st().updateActivities(['a2'], formatOf(source()));
+    for (const f of FORMAT_FIELDS) expect(target()[f]).toBe(source()[f]);
+  });
+
+  it('leaves position, name and everything else alone', () => {
+    st().updateActivity('a1', { color: '#f59e0b', fontSize: 16 });
+    const before = { ...target() };
+    st().updateActivities(['a2'], formatOf(source()));
+    const after = target();
+    expect(after.name).toBe(before.name);
+    expect(after.startMonth).toBe(before.startMonth);
+    expect(after.durationMonths).toBe(before.durationMonths);
+  });
+
+  it('carries an unset field as unset, so "automatic" is copied too', () => {
+    st().updateActivity('a2', { labelColor: '#ef4444', outlineColor: '#000000' });
+    st().updateActivities(['a2'], formatOf(source()));
+    expect(target().labelColor).toBeUndefined();
+    expect(target().outlineColor).toBeUndefined();
+  });
+
+  it('is one undo entry per paste', () => {
+    st().updateActivity('a1', { color: '#f59e0b', fontSize: 14 });
+    temporal().clear();
+    st().updateActivities(['a2'], formatOf(source()));
+    expect(temporal().pastStates.length).toBe(1);
+  });
+
+  it('reports whether a paste would change anything', () => {
+    expect(formatDiffers(target(), formatOf(source()))).toBe(false);
+    st().updateActivity('a1', { color: '#f59e0b' });
+    expect(formatDiffers(target(), formatOf(source()))).toBe(true);
+  });
+
+  it('arms once or sticky, and disarms', () => {
+    st().armFormatPainter(formatOf(source()), false);
+    expect(useStore.getState().formatPainter?.sticky).toBe(false);
+    st().armFormatPainter(formatOf(source()), true);
+    expect(useStore.getState().formatPainter?.sticky).toBe(true);
+    st().disarmFormatPainter();
+    expect(useStore.getState().formatPainter).toBeNull();
+  });
+
+  it('arming is not a chart change, so it costs no undo', () => {
+    temporal().clear();
+    st().armFormatPainter(formatOf(source()), true);
+    expect(temporal().pastStates.length).toBe(0);
   });
 });

@@ -27,6 +27,7 @@ import {
   AArrowUp,
   CircleDot,
   Tags,
+  Paintbrush,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +42,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useUndo, useRedo, useCanUndo, useCanRedo } from '@/stores/hooks';
 import { MIN_MONTH_WIDTH, MAX_MONTH_WIDTH, MIN_WEEK_WIDTH, MAX_WEEK_WIDTH, FONT_SIZE_STEPS, stepFontSize } from '@/constants/timeline';
-import { effectiveFontSize } from '@/utils/activity';
+import { effectiveFontSize, formatOf } from '@/utils/activity';
 import { MONTH_NAMES_SHORT } from '@/constants/timeline';
 import { getTotalMonths, getTotalWeeks } from '@/utils/timeline';
 import { fitUnitWidth } from '@/utils/layout';
@@ -122,6 +123,15 @@ export function Toolbar() {
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const showStatus = useStore((s) => s.showStatus);
   const showTopics = useStore((s) => s.showTopics);
+  const formatPainter = useStore((s) => s.formatPainter);
+  const armFormatPainter = useStore((s) => s.armFormatPainter);
+  const disarmFormatPainter = useStore((s) => s.disarmFormatPainter);
+  const selectedIds = useStore((s) => s.selectedActivityIds);
+  const painterSource = useStore((s) =>
+    s.selectedActivityIds.length > 0
+      ? activeChart(s).activities.find((a) => a.id === s.selectedActivityIds[0])
+      : undefined,
+  );
   const setShowTopics = useStore((s) => s.setShowTopics);
   const setShowStatus = useStore((s) => s.setShowStatus);
   const [toast, setToast] = useState<ToastMessage>(null);
@@ -493,6 +503,47 @@ export function Toolbar() {
             <TooltipContent>{showQuarters ? 'Hide Quarters' : 'Show Quarters'}</TooltipContent>
           </Tooltip>
         )}
+
+        {/* Format painter, following the Office model exactly.
+
+            A single click arms it for ONE activity; a double click arms it until switched off;
+            clicking while armed switches it off. That falls out of the event order for free:
+            the first click arms, the second click (armed already) disarms, and the `dblclick`
+            that follows arms it sticky — so a real double click ends up sticky and a single
+            click ends up armed once, with no timer to guess between them. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={formatPainter ? 'default' : 'ghost'}
+              size="icon"
+              aria-label="Copy formatting"
+              aria-pressed={!!formatPainter}
+              disabled={!painterSource && !formatPainter}
+              className="h-7 w-7"
+              onClick={() => {
+                if (formatPainter) {
+                  disarmFormatPainter();
+                  return;
+                }
+                if (painterSource) armFormatPainter(formatOf(painterSource), false);
+              }}
+              onDoubleClick={() => {
+                if (painterSource) armFormatPainter(formatOf(painterSource), true);
+              }}
+            >
+              <Paintbrush className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {formatPainter
+              ? formatPainter.sticky
+                ? 'Painting formats — click the button or press Escape to stop'
+                : 'Click a bar to paste the format'
+              : selectedIds.length === 0
+                ? 'Select a bar first, then copy its formatting'
+                : 'Copy formatting — double-click to paint several'}
+          </TooltipContent>
+        </Tooltip>
 
         {/* Topic column. A switch rather than something derived from the data: without it the
             column only appeared once a row already had a topic, so on a blank chart there was

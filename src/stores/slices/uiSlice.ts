@@ -13,6 +13,7 @@ import {
   ZOOM_STEP,
 } from '@/constants/timeline';
 import type { ChartDirection, TimelineMode } from '@/types/gantt';
+import type { ActivityFormat } from '@/utils/activity';
 
 export type SelectedActivity = {
   activityId: string;
@@ -27,6 +28,15 @@ export type SelectedDependency = {
 };
 
 export type RowSize = 'small' | 'medium' | 'large';
+
+/**
+ * The format painter, armed with a format picked up from one activity.
+ *
+ * `sticky` is the Office distinction: a single click on the button paints ONE activity and
+ * disarms, a double click keeps painting until it is switched off. Outside undo history — it
+ * is a mode, not a change to the chart.
+ */
+export type FormatPainter = { format: ActivityFormat; sticky: boolean } | null;
 
 export type UiSlice = {
   monthWidth: number;
@@ -50,6 +60,7 @@ export type UiSlice = {
   findQuery: string | null;
   /** Master switch for every status rail on the canvas. */
   showStatus: boolean;
+  formatPainter: FormatPainter;
   /** Whether the sideways topic column is shown. Off on a blank chart; the toolbar button
    *  is what reveals it, and loading a chart that has topics turns it on. */
   showTopics: boolean;
@@ -76,6 +87,9 @@ export type UiSlice = {
   setFindQuery: (query: string | null) => void;
   setShowStatus: (show: boolean) => void;
   setShowTopics: (show: boolean) => void;
+  /** Pick up a format. `sticky` keeps the painter armed after the first application. */
+  armFormatPainter: (format: ActivityFormat, sticky: boolean) => void;
+  disarmFormatPainter: () => void;
 };
 
 export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []> = (set) => ({
@@ -96,6 +110,7 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   findQuery: null as string | null,
   showStatus: true,
   showTopics: false,
+  formatPainter: null as FormatPainter,
 
   zoomIn: () =>
     set((state) => {
@@ -209,6 +224,16 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   setShowTopics: (show) =>
     set((state) => {
       state.showTopics = show;
+    }),
+
+  armFormatPainter: (format, sticky) =>
+    set((state) => {
+      state.formatPainter = { format, sticky };
+    }),
+
+  disarmFormatPainter: () =>
+    set((state) => {
+      state.formatPainter = null;
     }),
 
   setFindQuery: (query) =>

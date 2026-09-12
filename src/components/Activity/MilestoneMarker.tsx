@@ -12,7 +12,7 @@ import { AnnotationPopover } from './AnnotationPopover';
 import { ActivityNameInput } from './ActivityNameInput';
 import { ActivityContextMenu } from './ActivityContextMenu';
 import { StatusMark } from './StatusMark';
-import { effectiveFontSize, statusDrawsRail } from '@/utils/activity';
+import { effectiveFontSize, formatDiffers, statusDrawsRail } from '@/utils/activity';
 
 type MilestoneMarkerProps = {
   activity: Activity;
@@ -54,6 +54,25 @@ export function MilestoneMarker({
 }: MilestoneMarkerProps) {
   const setEditingActivity = useStore((s) => s.setEditingActivity);
   const showStatus = useStore((s) => s.showStatus);
+  const formatPainter = useStore((s) => s.formatPainter);
+  const disarmFormatPainter = useStore((s) => s.disarmFormatPainter);
+  const updateActivity = useStore((s) => s.updateActivity);
+
+  /**
+   * Paste the armed format, if there is one. Returns true when it consumed the gesture, so the
+   * caller can stop before selecting or starting a drag — a painter click must not also move
+   * the bar it lands on.
+   */
+  const paintIfArmed = (): boolean => {
+    if (!formatPainter) return false;
+    // One `updateActivity` for all four fields, so a paste is one Ctrl+Z.
+    if (formatDiffers(activity, formatPainter.format)) {
+      updateActivity(activity.id, formatPainter.format);
+    }
+    if (!formatPainter.sticky) disarmFormatPainter();
+    return true;
+  };
+
 
   const checkDoubleTap = useDoubleTap();
 
@@ -84,7 +103,8 @@ export function MilestoneMarker({
         data-activity-id={activity.id}
         data-milestone
         className={cn(
-          'activity-bar group absolute flex cursor-grab items-center rounded-md',
+          'activity-bar group absolute flex items-center rounded-md',
+          formatPainter ? 'cursor-copy' : 'cursor-grab',
           isSelected && 'activity-bar--selected ring-2 ring-ring ring-offset-1',
         )}
         style={{
@@ -101,6 +121,7 @@ export function MilestoneMarker({
         }}
         onClick={(e) => {
           e.stopPropagation();
+          if (formatPainter) return;
           onSelect(e.ctrlKey || e.metaKey || e.shiftKey);
         }}
         onDoubleClick={(e) => {
@@ -109,6 +130,10 @@ export function MilestoneMarker({
         }}
         onPointerDown={(e) => {
           if (e.button !== 0) return;
+          if (paintIfArmed()) {
+            e.stopPropagation();
+            return;
+          }
           if (checkDoubleTap(e)) {
             e.stopPropagation();
             onDoubleClick();

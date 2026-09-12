@@ -148,7 +148,11 @@ export function useKeyboardShortcuts() {
 
       // Escape → deselect / cancel editing
       if (e.key === 'Escape') {
-        if (state.findQuery !== null) {
+        // The painter first: it is a mode, and Escape leaving it armed while clearing the
+        // selection underneath would leave the pointer painting with nothing to show for it.
+        if (state.formatPainter) {
+          state.disarmFormatPainter();
+        } else if (state.findQuery !== null) {
           state.setFindQuery(null);
         } else if (state.editingActivity) {
           state.setEditingActivity(null);

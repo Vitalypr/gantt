@@ -42,6 +42,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       { label: "Colour", body: "Right-click and choose Colour. One palette laid out as a grid - a row per hue, a column per tone from 100 to 900 - with Fill, Frame and Text tabs above it. The dot on each tab shows what that tab currently holds." },
       { label: "Text colour", body: "The Text tab offers four: white, black, red and grey. Automatic is the default and picks black or white by measuring which one actually reads on that bar's fill, so leave it there unless you want a specific colour." },
       { label: "Font size", body: "Right-click for Font Size. The toolbar A- / A+ buttons resize the labels of everything selected." },
+      { label: "Copy formatting", body: "Select a bar, click the brush in the toolbar, then click another bar to paste its fill, frame, text colour and size. Double-click the brush to keep painting bar after bar; click it again or press Escape to stop. Nothing else about the bar moves - only the formatting." },
       { label: "Status", body: "Right-click and pick Status. No status leaves the bar as it is; Not relevant hatches the whole bar in diagonal grey; Not started, In progress and Done draw a grey rail inside the bottom edge - empty, half, full. Milestones take a status too." },
       { label: "Hide every status", body: "The target button in the toolbar shows or hides all the status marks at once, so a plan can be reviewed with delivery state on and exported without it." },
       { label: "Annotation", body: "Right-click and choose Add Annotation. Enter saves, Escape discards." },
@@ -55,7 +56,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     items: [
       { label: "Multi-select", body: "Ctrl-click (or Shift-click) bars to build a selection. Colour, font size and deletion then apply to all of them in a single undo step." },
       { label: "Keyboard", body: "Arrows nudge the selection, Shift+arrows resize, Alt+arrows move it between rows. Each press is one undo entry." },
-      { label: "Duplicate", body: "Ctrl+D copies the selection one unit later. Ctrl+C and Ctrl+V copy between rows." },
+      { label: "Copy and paste", body: "Ctrl+C copies the selected bars and Ctrl+V pastes them into the row of whatever is selected, one undo per paste. Ctrl+D duplicates the selection one unit later." },
       { label: "Find", body: "Ctrl+F searches activity and row names - including Hebrew - and jumps to a match." },
     ],
   },
@@ -112,6 +113,6 @@ export const HELP_SHORTCUTS: Shortcut[] = [
   { keys: ["\u2190", "\u2192"], description: "Move the selection in time" },
   { keys: ["Shift", "\u2190", "\u2192"], description: "Resize the selection" },
   { keys: ["Alt", "\u2191", "\u2193"], description: "Move the selection between rows" },
-  { keys: ["Escape"], description: "Cancel editing or clear the selection" },
+  { keys: ["Escape"], description: "Stop copying formatting, cancel editing, or clear the selection" },
   { keys: ["Ctrl", "wheel"], description: "Zoom around the pointer" },
 ];
