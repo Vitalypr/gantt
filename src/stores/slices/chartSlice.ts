@@ -42,6 +42,9 @@ export type ChartSlice = {
   setRowTopic: (rowId: string, topic: string) => void;
   /** Join or split this row's TOPIC cell with the next row's. */
   toggleRowTopicMerge: (rowId: string) => void;
+  /** Make the topic cell starting at `rowId` cover exactly `span` rows, in ONE commit —
+   *  the same shape as `setActivityRowSpan`, so a drag costs one Ctrl+Z. */
+  setTopicSpan: (rowId: string, span: number) => void;
   toggleRowGroup: (rowId: string) => void;
   toggleRowCollapsed: (rowId: string) => void;
   moveRow: (rowId: string, direction: 'up' | 'down') => void;
@@ -297,6 +300,35 @@ export const createChartSlice: StateCreator<ChartSlice & ModeDeps, [['zustand/im
       // an empty string would keep it alive with a blank cell.
       row.topic = next === '' ? undefined : next;
       if (next === '') row.topicMergedWithNext = undefined;
+      chart.updatedAt = new Date().toISOString();
+    }),
+
+  setTopicSpan: (rowId, span) =>
+    set((state) => {
+      const chart = withActive(state);
+      const ordered = [...chart.rows].sort((a, b) => a.order - b.order);
+      const i = ordered.findIndex((r) => r.id === rowId);
+      if (i < 0) return;
+
+      const wanted = Math.max(1, Math.min(ordered.length - i, Math.round(span)));
+
+      // How far the cell reaches TODAY. Rows released by a shrink have to be cleaned up, or
+      // they keep a merge flag that silently re-chains them into the next cell.
+      let oldEnd = i;
+      while (oldEnd < ordered.length - 1 && ordered[oldEnd]!.topicMergedWithNext) oldEnd += 1;
+
+      const touched = Math.max(oldEnd, i + wanted - 1);
+      for (let k = i; k <= touched; k++) {
+        ordered[k]!.topicMergedWithNext = undefined;
+        // Only the leader carries the label; a follower's own would be unreachable.
+        if (k > i) ordered[k]!.topic = undefined;
+      }
+      for (let k = i; k < i + wanted - 1; k++) ordered[k]!.topicMergedWithNext = true;
+
+      // A cell with no label does not render, so a span set on an unlabelled row would be
+      // invisible. Giving it a placeholder is what makes drag-to-create one action.
+      if (!ordered[i]!.topic?.trim()) ordered[i]!.topic = 'Topic';
+
       chart.updatedAt = new Date().toISOString();
     }),
 

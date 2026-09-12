@@ -184,3 +184,88 @@ describe('topic mutators', () => {
     expect(rowsOf()[0]!.mergedWithNext).toBeUndefined();
   });
 });
+
+/**
+ * Dragging a topic cell's edge is the same gesture as dragging a bar's row span, so it gets
+ * the same shape: one compound action, one undo entry, and the released rows cleaned up.
+ */
+describe('setTopicSpan', () => {
+  const seed = (): MonthsChart => ({
+    id: 'c', unit: 'month', name: 'T',
+    startYear: 2026, startMonth: 1, endYear: 2026, endMonth: 12,
+    rows: Array.from({ length: 6 }, (_, i) => ({
+      id: `r${i + 1}`, name: '', order: i, activityIds: [],
+    })),
+    activities: [], dependencies: [], createdAt: 'x', updatedAt: 'x',
+  });
+
+  const rowsOf = () => useStore.getState().chart.rows;
+  const cells = () => resolveTopicBands(rowsOf()).cells.map((c) => [c.leaderRowId, c.label, c.span]);
+
+  beforeEach(() => {
+    useStore.getState().setChart(seed());
+  });
+
+  it('covers exactly the rows asked for', () => {
+    useStore.getState().setRowTopic('r1', 'Design');
+    useStore.getState().setTopicSpan('r1', 3);
+    expect(cells()).toEqual([['r1', 'Design', 3]]);
+  });
+
+  it('names an unlabelled row, so one drag both creates and sizes the cell', () => {
+    useStore.getState().setTopicSpan('r2', 2);
+    expect(cells()).toEqual([['r2', 'Topic', 2]]);
+  });
+
+  it('keeps the label when resizing', () => {
+    useStore.getState().setRowTopic('r1', 'Design');
+    useStore.getState().setTopicSpan('r1', 4);
+    useStore.getState().setTopicSpan('r1', 2);
+    expect(cells()).toEqual([['r1', 'Design', 2]]);
+  });
+
+  it('releases the rows a shrink gives up, flags and all', () => {
+    useStore.getState().setRowTopic('r1', 'Design');
+    useStore.getState().setTopicSpan('r1', 5);
+    useStore.getState().setTopicSpan('r1', 2);
+    for (const id of ['r3', 'r4', 'r5']) {
+      const row = rowsOf().find((r) => r.id === id)!;
+      expect(row.topicMergedWithNext, `${id} kept a merge flag`).toBeUndefined();
+      expect(row.topic, `${id} kept a label`).toBeUndefined();
+    }
+  });
+
+  it('does not let a shrink re-chain released rows into the next cell', () => {
+    useStore.getState().setRowTopic('r1', 'Design');
+    useStore.getState().setTopicSpan('r1', 4);
+    useStore.getState().setRowTopic('r5', 'Build');
+    useStore.getState().setTopicSpan('r1', 2);
+    expect(cells()).toEqual([['r1', 'Design', 2], ['r5', 'Build', 1]]);
+  });
+
+  it('clears a follower label swallowed by a grow', () => {
+    useStore.getState().setRowTopic('r1', 'Design');
+    useStore.getState().setRowTopic('r3', 'Stray');
+    useStore.getState().setTopicSpan('r1', 4);
+    expect(cells()).toEqual([['r1', 'Design', 4]]);
+  });
+
+  it('clamps at the ends rather than running off them', () => {
+    useStore.getState().setRowTopic('r5', 'Late');
+    useStore.getState().setTopicSpan('r5', 99);
+    expect(cells()).toEqual([['r5', 'Late', 2]]);
+    useStore.getState().setTopicSpan('r5', 0);
+    expect(cells()).toEqual([['r5', 'Late', 1]]);
+  });
+
+  it('is one commit, so a drag costs one undo', () => {
+    // `getState()` is a snapshot — re-read it after the action or `pastStates` is the count
+    // from before the clear.
+    const temporal = () => (useStore as unknown as {
+      temporal: { getState: () => { pastStates: unknown[]; clear: () => void } };
+    }).temporal.getState();
+    temporal().clear();
+    useStore.getState().setTopicSpan('r1', 4);
+    expect(temporal().pastStates.length).toBe(1);
+  });
+});
