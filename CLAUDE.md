@@ -29,7 +29,7 @@ Package manager is **pnpm**.
 |---|---|
 | `pnpm dev` | Vite dev server |
 | `pnpm build` | `tsc -b && vite build` → `dist/` |
-| `pnpm lint` | ESLint (currently **fails** — see roadmap R-LINT) |
+| `pnpm lint` | ESLint — 0 errors, 20 warnings (R-LINT closed; warnings are by choice) |
 | `pnpm test` / `pnpm test:watch` | Vitest |
 | `pnpm build:single` | One self-contained HTML file → `dist-single/` (**tracked** — see below) |
 | `pnpm build:exe` | Standalone Windows EXE → `dist-exe/` |
@@ -60,9 +60,10 @@ These cause real bugs when violated and cannot be inferred from a quick read.
   distributable, so it must never lag `src/`. `.githooks/pre-commit` rebuilds and stages it
   whenever a commit touches `src/`, `public/`, `index.html`, `package.json` or the
   single-file vite config; `package.json`'s `prepare` script points `core.hooksPath` at
-  `.githooks` on install. The build is deterministic, so an unchanged bundle produces no
-  diff. `.gitattributes` marks the file `-text` — the inlined bundle contains raw CR bytes
-  and `core.autocrlf=true` would otherwise rewrite them on checkout. Everything else in
+  `.githooks` on install. `.gitattributes` marks it `-text`: the inlined bundle holds raw CR
+  bytes that `core.autocrlf=true` would rewrite. Determinism is per checkout, not across
+  machines — `index.html` and `public/favicon.svg` inline verbatim (the favicon base64), so a
+  checkout holding them as LF rebuilds 26 bytes smaller and the hook commits that churn. Everything else in
   `dist-single/` is a copy of `public/` and stays ignored, which means a clone has the HTML
   but not `easter_egg.jpg`.
 

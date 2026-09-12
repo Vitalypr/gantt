@@ -1,12 +1,12 @@
 # Handoff
 
-_Updated 2026-09-12 · branch `main` · nothing committed_
+_Updated 2026-09-12 · branch `feat/rtl-hebrew-holidays-and-roadmap` · committed at `ed9dfc1`, not pushed_
 
 ## State
 
-All gates green: `tsc -b` 0 · `pnpm lint` **0 errors** (19 warnings) · `pnpm test` **163
-passing** · `pnpm test:e2e` **46 passing** (30 parked) · `pnpm build` and `pnpm build:single`
-both succeed.
+All gates green: `tsc -b` 0 · `pnpm lint` **0 errors** (20 warnings) · `pnpm test` **163
+passing** · `pnpm test:e2e` **47 passing** (30 parked) · `pnpm build` and `pnpm build:single`
+both succeed. Verified on a clean Linux checkout of `ed9dfc1`, not just on the dev box.
 
 `docs/TASKS.md` is the task register and `docs/improvement-roadmap.md` the defect register.
 **Both are currently empty of open items.** Every roadmap entry is ✅ and verified present in
@@ -43,12 +43,14 @@ kept recurring.
 
 ## Open threads
 
-- **Nothing is committed.** Still the only thing between this state and another total loss.
+- **`ed9dfc1` is unpushed.** The work is committed now, but it exists on one disk only;
+  `origin/main` is still at `c4e4054` and the branch has no remote counterpart. Pushing it is
+  the only thing between this state and another total loss.
 - **`e2e/features.spec.ts` and `gestures.spec.ts` are parked** (`describe.skip`) with a banner
   saying why: they need a `window.__ganttStore` test hook that was lost. Much of what they
   describe now exists, so they are worth reviving behind that hook.
 - Five drag hooks still lack `pointercancel` handling; `useDragMove` is the one to copy from.
-- 19 lint warnings remain, all `react-hooks` memoisation notes on the drag hooks. They are
+- 20 lint warnings remain, all `react-hooks` memoisation notes on the drag hooks. They are
   warnings by choice: this project does not run the React Compiler.
 
 ## Traps
@@ -61,6 +63,9 @@ kept recurring.
   Re-run `pnpm build` afterwards.
 - **`dist-single/index.html` must stay `-text` in `.gitattributes`.** The inlined bundle holds
   raw CR bytes; `core.autocrlf` would rewrite them and the file would differ from every build.
+  Its bytes also depend on the checkout: `index.html` and `public/favicon.svg` are inlined
+  verbatim, so rebuilding where those are LF yields a bundle 26 bytes smaller than the
+  committed one. Rebuild only where `core.autocrlf=true` gave you CRLF copies of them.
 - **Never clear `localStorage` from `page.addInitScript`** in an E2E spec: it re-runs on
   `page.reload()` and wipes the state a persistence test is checking. Playwright already gives
   each test a fresh context.
