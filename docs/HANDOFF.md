@@ -69,8 +69,12 @@ kept recurring.
   describe now exists, so they are worth reviving behind that hook.
 - Four drag hooks still lack `pointercancel` handling; `useDragMove` is the one to copy from,
   and `useResizeSidebar` now handles it too.
-- 20 lint warnings remain, all `react-hooks` memoisation notes on the drag hooks. They are
-  warnings by choice: this project does not run the React Compiler.
+- 19 lint warnings remain, and the set is now uniform on purpose: **every one names a `*Ref`**,
+  which is stable, so omitting it is genuinely harmless. That uniformity is the point. The set
+  used to be described as "memoisation notes, warnings by choice", and a real defect was hiding
+  inside it — `useDragCreate` omitted `unitAt`, a body-level function closing over `isRtl`, so
+  after switching to RTL a double-click created the bar at the mirrored column. Triage each new
+  warning by what it names: a ref is benign, a value or a body-level function is a bug.
 
 ## Traps
 

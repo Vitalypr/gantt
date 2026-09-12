@@ -19,9 +19,12 @@ export function FindPanel() {
   const rows = chart.rows;
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Named, not `[query !== null]`: a computed dependency cannot be checked statically, so the
+  // linter reports it as a missing dep and the noise sits alongside the ones that matter.
+  const isOpen = query !== null;
   useEffect(() => {
-    if (query !== null) inputRef.current?.focus();
-  }, [query !== null]);
+    if (isOpen) inputRef.current?.focus();
+  }, [isOpen]);
 
   const matches = useMemo(() => {
     const q = (query ?? '').trim().toLocaleLowerCase();

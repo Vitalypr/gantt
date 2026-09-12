@@ -4,8 +4,31 @@ import { DEFAULT_ACTIVITY_COLOR } from '@/constants/colors';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { clampStartUnit, unitSpanToLeft, xToUnit } from '@/utils/timeline';
 import { useChartDirection } from '@/hooks/useChartDirection';
+import { useLatest } from '@/hooks/useLatest';
 
 const DRAG_THRESHOLD = 20;
+
+/**
+ * Pointer x to a unit index, clamped into the chart.
+ *
+ * Module scope on purpose. As a function defined in the component body it closed over
+ * `isRtl`, and both callbacks that used it are memoised on a stable dependency — so they
+ * captured it once and kept the direction from first render for the life of the session.
+ * Taking `isRtl` as an argument makes that impossible to express.
+ */
+function unitAtX(
+  clientX: number,
+  timelineLeftOffset: number,
+  unitWidth: number,
+  totalUnits: number,
+  isRtl: boolean,
+): number {
+  return clampStartUnit(
+    xToUnit(clientX - timelineLeftOffset, unitWidth, totalUnits, isRtl),
+    1,
+    totalUnits,
+  );
+}
 
 type DragCreateState = {
   rowId: string;
@@ -21,6 +44,12 @@ export function useDragCreate() {
   const [dragState, setDragState] = useState<DragCreateState>(null);
 
   const { isRtl } = useChartDirection();
+  // Read through a ref, not the closure. Both create callbacks are memoised on
+  // `[createActivity]`, which is stable, so they are built ONCE — and a closed-over `isRtl`
+  // stayed at whatever it was on first render. Toggling to RTL then left every created bar
+  // mirrored, while the ghost preview (which reads `isRtl` during render) drew it correctly:
+  // the bar landed nowhere near where the preview had been.
+  const isRtlRef = useLatest(isRtl);
   const checkDoubleTap = useDoubleTap();
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -41,9 +70,6 @@ export function useDragCreate() {
     [addActivity, setEditingActivity],
   );
 
-  const unitAt = (clientX: number, timelineLeftOffset: number, monthWidth: number, totalUnits: number) =>
-    clampStartUnit(xToUnit(clientX - timelineLeftOffset, monthWidth, totalUnits, isRtl), 1, totalUnits);
-
   /**
    * Mouse double-click to create a one-unit activity.
    *
@@ -52,7 +78,7 @@ export function useDragCreate() {
    */
   const onDoubleClick = useCallback(
     (e: React.MouseEvent, rowId: string, timelineLeftOffset: number, monthWidth: number, totalUnits: number) => {
-      createActivity(unitAt(e.clientX, timelineLeftOffset, monthWidth, totalUnits), 1, rowId);
+      createActivity(unitAtX(e.clientX, timelineLeftOffset, monthWidth, totalUnits, isRtlRef.current), 1, rowId);
     },
     [createActivity],
   );
@@ -61,7 +87,7 @@ export function useDragCreate() {
     (e: React.PointerEvent, rowId: string, timelineLeftOffset: number, monthWidth: number, totalUnits: number) => {
       if (e.button !== 0) return;
 
-      const startMonth = unitAt(e.clientX, timelineLeftOffset, monthWidth, totalUnits);
+      const startMonth = unitAtX(e.clientX, timelineLeftOffset, monthWidth, totalUnits, isRtlRef.current);
 
       // Touch/pen double-tap (key = rowId so taps on different rows don't pair)
       if (checkDoubleTap(e, rowId)) {
@@ -85,7 +111,7 @@ export function useDragCreate() {
           isDraggingRef.current = true;
         }
 
-        const currentMonth = unitAt(moveEvent.clientX, timelineLeftOffset, monthWidth, totalUnits);
+        const currentMonth = unitAtX(moveEvent.clientX, timelineLeftOffset, monthWidth, totalUnits, isRtlRef.current);
         setDragState({ rowId, startMonth, currentMonth, monthWidth, totalUnits });
       };
 
@@ -97,7 +123,7 @@ export function useDragCreate() {
         if (isDraggingRef.current) {
           // The SAME `unitAt` the preview used. When the ghost floored and the commit
           // rounded, the created bar could sit one column away from what the user saw.
-          const endMonth = unitAt(upEvent.clientX, timelineLeftOffset, monthWidth, totalUnits);
+          const endMonth = unitAtX(upEvent.clientX, timelineLeftOffset, monthWidth, totalUnits, isRtlRef.current);
           const s = Math.min(startMonth, endMonth);
           const e2 = Math.max(startMonth, endMonth);
           // Inclusive of both end columns: dragging across one column creates a 1-unit bar.
@@ -111,7 +137,8 @@ export function useDragCreate() {
       target.onpointermove = handlePointerMove;
       target.onpointerup = handlePointerUp;
     },
-    [createActivity],
+    // `checkDoubleTap` is memoised now, so it can be declared honestly instead of omitted.
+    [createActivity, checkDoubleTap],
   );
 
   const ghostBar = dragState

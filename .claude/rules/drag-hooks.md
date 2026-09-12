@@ -53,35 +53,47 @@ mid-gesture** — that is what keeps a drag to one undo entry. Preserve it.
    two things routes through one of them. Adding a gesture that calls two mutators costs two
    Ctrl+Z presses and passes through a state the user never saw; add a compound action
    instead.
-2. **Never write a ref during render.** `someRef.current = value` in a component body is
+2. **A missing-dependency warning is only benign when the missing name is a `*Ref`.**
+   `pnpm lint`'s `react-hooks/exhaustive-deps` warnings were described for a long time as
+   "memoisation notes, warnings by choice". Most were: a missing `rowsRef` or `monthWidthRef`
+   is harmless because a ref is stable. But the same wording was covering a real defect —
+   `useDragCreate` omitted `unitAt`, a function defined in the component body that closed over
+   `isRtl`, and both callbacks using it were memoised on a stable dependency. They were built
+   once and kept the direction from first render, so after switching to RTL a double-click
+   created the bar at the mirrored column: measured at unit 3 instead of 32, drawn at x=2560
+   instead of x=240, while the ghost preview (which reads `isRtl` during render) was correct.
+   Triage each warning by what it names. A ref: benign. A value, or a function declared in the
+   component body: a bug. Keep the set uniform — every warning that survives should name only
+   refs, so the next dangerous one stands out instead of blending in.
+3. **Never write a ref during render.** `someRef.current = value` in a component body is
    unsafe under StrictMode and concurrent rendering, and ESLint flags it. Use
    **`hooks/useLatest.ts`**, which syncs in an effect. `pnpm lint` is at zero errors — keep
    it there.
-3. **Read live values through `useLatest`, not the closure.** `monthWidth`, `rowSize` and the
+4. **Read live values through `useLatest`, not the closure.** `monthWidth`, `rowSize` and the
    row layout all change mid-drag, and the `useCallback` closure captures the values from the
    render that created it. The exception is a ref the gesture itself writes — `useDragConnect`'s
    `dragRef` holds the current snap target and is assigned **by the pointer handlers**, because
    an effect-synced ref lags by a commit and a flick whose last pointermove and pointerup land
    in the same frame would read a stale target and silently drop the dependency.
-4. **Commit from what the preview last showed**, not by re-deriving from the pointerup
+5. **Commit from what the preview last showed**, not by re-deriving from the pointerup
    event. `useDragCreate` runs the same `unitAt` for the ghost and the commit; when one
    floored and the other rounded, the created bar could sit a column from what the user saw.
-5. **Clamp positional writes at BOTH ends** with `clampStartUnit`. A lower-bound-only clamp
+6. **Clamp positional writes at BOTH ends** with `clampStartUnit`. A lower-bound-only clamp
    puts the overflow past the chart end in LTR — and off the LEFT edge in RTL, outside the
    scroll container's reach.
-6. **Every index→pixel conversion goes through `utils/timeline.ts`.** `unitSpanToLeft`,
+7. **Every index→pixel conversion goes through `utils/timeline.ts`.** `unitSpanToLeft`,
    `xToUnit`, `deltaToUnits`, `dateToUnitOffset`. RTL is arithmetic mirroring; a hook that
    does its own `clientX / width` maths is correct in LTR and silently wrong in RTL.
    `useDragResize` additionally goes through `visualEdgeToTemporalEdge`, because in RTL the
    visually-left edge controls the temporal END.
-7. **Thresholds belong in `src/constants/timeline.ts`.** `EDGE_THRESHOLD` (12px, left/right
+8. **Thresholds belong in `src/constants/timeline.ts`.** `EDGE_THRESHOLD` (12px, left/right
    resize), `ROW_SPAN_EDGE_THRESHOLD` (6px, top/bottom) and `DOUBLE_TAP_*` live there.
    `DRAG_THRESHOLD` is still a module-local `4` in three hooks, `20` in `useDragCreate`, and
    `SNAP_DISTANCE` is `20` inside `useDragConnect` — move them when you next touch those.
    The two edge thresholds differ deliberately: a bar is only `rowHeight - 8` tall, so a 12px
    zone at each end left just 8px that started a move and made dragging a bar to another row
    nearly impossible.
-8. **Anything draggable by pointer needs `touch-action: none`** in `index.css`, otherwise
+9. **Anything draggable by pointer needs `touch-action: none`** in `index.css`, otherwise
    `[data-gantt-scroll]` swallows the gesture on touch devices.
 
 ## Coordinate conversions
