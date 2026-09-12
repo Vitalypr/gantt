@@ -66,7 +66,10 @@ export function MilestoneMarker({
   const isDark = isColorDark(activity.color);
   const labelColor = activity.labelColor ?? (isDark ? '#ffffff' : '#0f172a');
   const fontSize = effectiveFontSize(activity);
-  const frameColor = activity.outlineColor ?? 'var(--color-bar-outline)';
+  // Gold by default, and only by default: a frame the user set explicitly still wins. The
+  // heavy frame is what distinguishes a milestone from a one-unit bar, so it carries the
+  // distinction in colour as well as weight.
+  const frameColor = activity.outlineColor ?? 'var(--color-milestone-outline)';
   const mark = showStatus ? activity.status : undefined;
   const rail = statusDrawsRail(mark);
 

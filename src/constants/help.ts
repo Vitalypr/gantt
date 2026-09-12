@@ -38,7 +38,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       { label: "Move", body: "Drag a bar. Dragging vertically moves it to another row; position and row commit together, so it costs one undo." },
       { label: "Resize", body: "Drag the left or right edge. In right-to-left mode the edges still control the dates they look like they control." },
       { label: "Span rows", body: "Drag the thin top or bottom edge of a bar to make it cover several rows." },
-      { label: "Milestone", body: "Right-click a bar and choose Convert to Milestone. A milestone is a one-unit bar with a heavy frame, so it occupies exactly the space a one-unit activity would." },
+      { label: "Milestone", body: "Right-click a bar and choose Convert to Milestone. A milestone is a one-unit bar with a heavy gold frame, so it occupies exactly the space a one-unit activity would while reading as a different kind of mark. Set a Frame colour to override the gold." },
       { label: "Colour", body: "Right-click and choose Colour. One palette laid out as a grid - a row per hue, a column per tone from 100 to 900 - with Fill, Frame and Text tabs above it. The dot on each tab shows what that tab currently holds." },
       { label: "Text colour", body: "The Text tab offers four: white, black, red and grey. Automatic is the default and picks black or white by measuring which one actually reads on that bar's fill, so leave it there unless you want a specific colour." },
       { label: "Font size", body: "Right-click for Font Size. The toolbar A- / A+ buttons resize the labels of everything selected." },

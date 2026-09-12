@@ -51,6 +51,11 @@
   --color-anchor-dot-bg: #9ca3af;
   --color-anchor-dot-border: #ffffff;
   --color-bar-outline: #9ca3af;
+  /* Milestones frame in gold, not amber and not yellow — metallic gold reads as a different
+     KIND of mark, where an orange or a yellow reads as just another bar colour. Deeper in the
+     light theme: #d4af37 scores 2.03:1 on this near-white canvas against 8.97:1 on the dark
+     one, and the frame is the whole thing that distinguishes a milestone. */
+  --color-milestone-outline: #b8912b;
   /* Half-transparent red, so the grid still reads through a shaded column. */
   --color-holiday: rgb(239 68 68 / 0.5);
 
@@ -120,6 +125,7 @@
   --color-anchor-dot-bg: #6b7084;
   --color-anchor-dot-border: #161822;
   --color-bar-outline: #6b7084;
+  --color-milestone-outline: #d4af37;
   --color-holiday: rgb(248 113 113 / 0.5);
 
   --shadow-bar: inset 0 0 0 1px rgb(255 255 255 / 0.08), 0 1px 2px rgba(0, 0, 0, 0.4);

@@ -78,7 +78,10 @@ describe('help manifest', () => {
     // The legend was removed from the toolbar. Help that still describes it sends someone
     // looking for a control that is not there. (`progress` is not banned outright — "In
     // progress" is a status name.)
-    for (const gone of ['legend', 'show legend', 'fill colour', 'frame colour']) {
+    // Only the legend. Banning "frame colour" outright was too blunt — Frame is still a tab,
+    // and prose may legitimately name it; the ban was meant for the old separate submenus,
+    // which the positive assertions above already cover by requiring the new wording.
+    for (const gone of ['legend', 'show legend']) {
       expect(all, `help still describes ${gone}`).not.toContain(gone);
     }
   });
