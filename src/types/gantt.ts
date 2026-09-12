@@ -63,12 +63,16 @@ export const CHART_DIRECTIONS = ['ltr', 'rtl'] as const;
 export type ChartDirection = (typeof CHART_DIRECTIONS)[number];
 
 /**
- * Three states plus the absence of one.
+ * Four drawn states plus the absence of one.
+ *
+ * `undefined` is not a state — it is a bar nobody has classified, and it draws nothing. `'na'`
+ * is the deliberate "out of scope", drawn as a hatch. They must stay distinct: folding them
+ * together would hatch every bar in every chart drawn before statuses existed.
  *
  * Discrete on purpose: this is a drawing tool, and a percentage would imply a precision it
  * does not model. Replaced a numeric `progress` that the menu wrote and nothing ever read.
  */
-export const ACTIVITY_STATUSES = ['todo', 'doing', 'done'] as const;
+export const ACTIVITY_STATUSES = ['na', 'todo', 'doing', 'done'] as const;
 export type ActivityStatus = (typeof ACTIVITY_STATUSES)[number];
 
 export type ViewSettings = {

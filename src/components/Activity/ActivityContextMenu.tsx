@@ -47,7 +47,8 @@ type ActivityContextMenuProps = {
  * existed.
  */
 const STATUS_CHOICES: { value: ActivityStatus | undefined; label: string }[] = [
-  { value: undefined, label: 'Not relevant' },
+  { value: undefined, label: 'No status' },
+  { value: 'na', label: 'Not relevant' },
   { value: 'todo', label: 'Not started' },
   { value: 'doing', label: 'In progress' },
   { value: 'done', label: 'Done' },
@@ -202,17 +203,33 @@ export function ActivityContextMenu({
   );
 }
 
-/** The rail, at menu scale, so the list shows the mark rather than describing it. */
+/** The mark, at menu scale, so the list shows what it draws rather than describing it. */
 function StatusSwatch({ status }: { status: ActivityStatus | undefined }) {
   if (status === undefined) {
-    return <span className="mr-2 h-1 w-6 shrink-0 rounded-full border border-dashed border-current opacity-30" />;
+    return <span className="mr-2 h-2.5 w-6 shrink-0 rounded-sm border border-dashed border-current opacity-30" />;
   }
-  return (
-    <span className="mr-2 h-1 w-6 shrink-0 overflow-hidden rounded-full bg-current/25">
+
+  const fraction = statusFillFraction(status);
+  if (fraction === null) {
+    return (
       <span
-        className="block h-full rounded-full bg-current"
-        style={{ width: `${statusFillFraction(status) * 100}%` }}
+        className="mr-2 h-2.5 w-6 shrink-0 rounded-sm border border-current/30"
+        style={{
+          backgroundImage:
+            'repeating-linear-gradient(45deg, currentColor 0 1px, transparent 1px 4px)',
+        }}
       />
+    );
+  }
+
+  return (
+    <span className="mr-2 flex h-2.5 w-6 shrink-0 items-center">
+      <span className="h-1 w-full overflow-hidden rounded-full bg-current/30">
+        <span
+          className="block h-full rounded-full bg-current"
+          style={{ width: `${fraction * 100}%` }}
+        />
+      </span>
     </span>
   );
 }

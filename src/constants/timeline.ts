@@ -68,8 +68,18 @@ export const BAR_OUTLINE_WIDTH = 1.5;
  */
 export const STATUS_RAIL_HEIGHT = 3;
 export const STATUS_RAIL_BOTTOM = 3;
-/** Horizontal inset, enough to clear the bar's corner radius. */
-export const STATUS_RAIL_INSET = 5;
+/** Horizontal inset from each end of the bar. */
+export const STATUS_RAIL_INSET = 12;
+/** Floor for that inset on a narrow bar, so the rail shrinks rather than disappearing.
+ *  Also keeps it clear of a milestone's 3px frame. */
+export const STATUS_RAIL_INSET_MIN = 4;
+/** Share of the bar each inset may take before the floor applies. */
+export const STATUS_RAIL_INSET_MAX_SHARE = '25%';
+
+/** Diagonal hatch that marks a "not relevant" bar. */
+export const STATUS_HATCH_ANGLE = 45;
+export const STATUS_HATCH_STROKE = 1.5;
+export const STATUS_HATCH_PITCH = 7;
 /** Vertical space the label gives up while a rail is shown — nothing when it is not. */
 export const STATUS_RAIL_RESERVE = STATUS_RAIL_HEIGHT + STATUS_RAIL_BOTTOM;
 

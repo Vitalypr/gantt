@@ -11,9 +11,14 @@ export function effectiveFontSize(activity: Activity): number {
   return activity.fontSize ?? defaultFontSize(activity);
 }
 
-/** How much of the status rail is filled, 0 to 1. */
-export function statusFillFraction(status: ActivityStatus): number {
+/**
+ * How much of the status rail is filled, 0 to 1 — or null for a status that is not drawn as a
+ * rail at all. `'na'` is a hatch over the whole bar, so it has no rail and reserves no height.
+ */
+export function statusFillFraction(status: ActivityStatus): number | null {
   switch (status) {
+    case 'na':
+      return null;
     case 'todo':
       return 0;
     case 'doing':
@@ -21,6 +26,11 @@ export function statusFillFraction(status: ActivityStatus): number {
     case 'done':
       return 1;
   }
+}
+
+/** True when this status is drawn as a rail, and so costs the label `STATUS_RAIL_RESERVE`. */
+export function statusDrawsRail(status: ActivityStatus | undefined): boolean {
+  return status !== undefined && statusFillFraction(status) !== null;
 }
 
 /**

@@ -58,20 +58,41 @@ export function withAlpha(hex: string, alpha: number): string {
   return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
 }
 
-/** Track and fill alphas for the status rail. */
-const RAIL_TRACK_ALPHA = 0.28;
-const RAIL_FILL_ALPHA = 0.95;
-
 /**
- * The two inks a status rail draws with, on a bar of `background`.
+ * The two greys a status mark draws with. slate-200 and slate-500.
  *
- * Derived from the same measured choice as the label, so the rail stays legible on a 100
- * tint and a 900 alike instead of being a hardcoded black or white that disappears on one
- * half of the palette.
+ * Chosen over the label's near-black/white pair, which read as black on a pale bar. The cost
+ * is measured and accepted: across the 100-swatch palette the better of these two bottoms out
+ * at ~1.9:1 on the mid-tone blues and pinks, under the 3:1 floor WCAG 1.4.11 sets for non-text
+ * UI. A single grey is not an option at all — slate-400 scores 1.03:1 against teal-500, the
+ * default bar colour, so the rail would be invisible on most charts.
+ * `activity-status.test.ts` pins that floor so a palette change cannot quietly lower it.
  */
-export function railInk(background: string): { track: string; fill: string } {
-  const ink = pickLabelColor(background);
-  return { track: withAlpha(ink, RAIL_TRACK_ALPHA), fill: withAlpha(ink, RAIL_FILL_ALPHA) };
+export const RAIL_INK_LIGHT = '#e2e8f0';
+export const RAIL_INK_DARK = '#64748b';
+
+/** Empty track: present enough to read as a track at zero, not as a missing mark. */
+const RAIL_TRACK_ALPHA = 0.45;
+/** Hatch strokes, per ink — the light grey needs more weight to carry on a mid-tone fill. */
+const HATCH_ALPHA_LIGHT = 0.85;
+const HATCH_ALPHA_DARK = 0.6;
+
+/** Every ink a status mark needs on a bar of `background`, from one contrast decision. */
+export function railInk(background: string): {
+  ink: string;
+  track: string;
+  fill: string;
+  hatch: string;
+} {
+  const light =
+    contrastRatio(RAIL_INK_LIGHT, background) >= contrastRatio(RAIL_INK_DARK, background);
+  const ink = light ? RAIL_INK_LIGHT : RAIL_INK_DARK;
+  return {
+    ink,
+    track: withAlpha(ink, RAIL_TRACK_ALPHA),
+    fill: ink,
+    hatch: withAlpha(ink, light ? HATCH_ALPHA_LIGHT : HATCH_ALPHA_DARK),
+  };
 }
 
 /** True when a white label wins on this background. */

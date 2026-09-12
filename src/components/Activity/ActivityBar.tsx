@@ -16,8 +16,8 @@ import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { AnnotationPopover } from './AnnotationPopover';
 import { ActivityNameInput } from './ActivityNameInput';
 import { ActivityContextMenu } from './ActivityContextMenu';
-import { StatusRail } from './StatusRail';
-import { effectiveFontSize } from '@/utils/activity';
+import { StatusMark } from './StatusMark';
+import { effectiveFontSize, statusDrawsRail } from '@/utils/activity';
 
 type ActivityBarProps = {
   activity: Activity;
@@ -82,9 +82,10 @@ export function ActivityBar({
   const fontSize = effectiveFontSize(activity);
   // Undefined means "follow the theme": a frozen literal would not re-theme in dark mode.
   const frameColor = activity.outlineColor ?? 'var(--color-bar-outline)';
-  // The rail is absolutely positioned, so the ONLY height it costs the label is this
-  // reserve — and only while a rail is actually drawn. An untracked bar is unchanged.
-  const rail = showStatus ? activity.status : undefined;
+  // The mark is absolutely positioned, so the ONLY height it costs the label is this reserve —
+  // and only for the statuses drawn as a rail. A hatched or untracked bar is unchanged.
+  const mark = showStatus ? activity.status : undefined;
+  const rail = statusDrawsRail(mark);
 
   const effectiveRowSpan = rowSpanOverride ?? rowSpan;
   const isSpanning = effectiveRowSpan > 1;
@@ -180,7 +181,7 @@ export function ActivityBar({
           {/* Name label or edit input */}
           {/* self-stretch + clip: the label box IS the padded content box, so no font size
               or line count can push text over the rail. */}
-          <div className="flex min-w-0 flex-1 items-center justify-center self-stretch overflow-hidden px-2">
+          <div className="relative z-[2] flex min-w-0 flex-1 items-center justify-center self-stretch overflow-hidden px-2">
             {isEditing ? (
               <ActivityNameInput
                 activityId={activity.id}
@@ -203,12 +204,12 @@ export function ActivityBar({
             )}
           </div>
 
-          {rail && <StatusRail status={rail} barColor={activity.color} isRtl={isRtl} />}
+          {mark && <StatusMark status={mark} barColor={activity.color} isRtl={isRtl} />}
 
           {/* Duration label - bottom right, lifted clear of the rail when one is drawn */}
           {!isEditing && duration > 1 && (
             <span
-              className="absolute right-1 text-[9px] font-medium leading-none opacity-60"
+              className="absolute right-1 z-[2] text-[9px] font-medium leading-none opacity-60"
               style={{ color: labelColor, bottom: rail ? STATUS_RAIL_RESERVE + 1 : 2 }}
             >
               {duration}{timelineMode === 'weeks' ? 'w' : 'm'}

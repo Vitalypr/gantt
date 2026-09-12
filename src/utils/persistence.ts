@@ -1,5 +1,6 @@
-import type { Chart, MonthsChart, SavedChartEntry, TimelineMode, WeeksChart } from '@/types/gantt';
+import type { Chart, MonthsChart, SavedChartEntry, TimelineMode, WeeksChart, ActivityStatus } from '@/types/gantt';
 import { statusFromLegacyProgress } from '@/utils/activity';
+import { ACTIVITY_STATUSES } from '@/types/gantt';
 import { unitForMode } from '@/types/gantt';
 import { parseViewSettings } from '@/utils/viewSettings';
 
@@ -407,7 +408,10 @@ export function normalizeChart<T extends Chart>(chart: T): T {
     // number, and this is the one ingress every chart passes through, so the mapping lives
     // here rather than in `migrateChart` — which returns early for already-flat charts.
     const { progress, ...rest } = a as typeof a & { progress?: unknown };
-    const status = a.status ?? statusFromLegacyProgress(progress) ?? undefined;
+    // Validate here, once: past this point every layer trusts the field, and an unknown
+    // string would reach the renderer's exhaustive switch and fall through it.
+    const known = ACTIVITY_STATUSES.includes(a.status as ActivityStatus) ? a.status : undefined;
+    const status = known ?? statusFromLegacyProgress(progress) ?? undefined;
     return {
       ...rest,
       status,

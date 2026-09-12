@@ -11,8 +11,8 @@ import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { AnnotationPopover } from './AnnotationPopover';
 import { ActivityNameInput } from './ActivityNameInput';
 import { ActivityContextMenu } from './ActivityContextMenu';
-import { StatusRail } from './StatusRail';
-import { effectiveFontSize } from '@/utils/activity';
+import { StatusMark } from './StatusMark';
+import { effectiveFontSize, statusDrawsRail } from '@/utils/activity';
 
 type MilestoneMarkerProps = {
   activity: Activity;
@@ -67,7 +67,8 @@ export function MilestoneMarker({
   const labelColor = isDark ? '#ffffff' : '#0f172a';
   const fontSize = effectiveFontSize(activity);
   const frameColor = activity.outlineColor ?? 'var(--color-bar-outline)';
-  const rail = showStatus ? activity.status : undefined;
+  const mark = showStatus ? activity.status : undefined;
+  const rail = statusDrawsRail(mark);
 
   return (
     <ActivityContextMenu
@@ -122,7 +123,7 @@ export function MilestoneMarker({
           iconColorStyle={{ color: labelColor }}
         />
 
-        <div className="flex min-w-0 flex-1 items-center justify-center self-stretch overflow-hidden px-1">
+        <div className="relative z-[2] flex min-w-0 flex-1 items-center justify-center self-stretch overflow-hidden px-1">
           {isEditing ? (
             <ActivityNameInput
                 activityId={activity.id}
@@ -143,15 +144,7 @@ export function MilestoneMarker({
           )}
         </div>
 
-        {/* Inset clears the milestone's heavier frame, which is thicker than a bar's. */}
-        {rail && (
-          <StatusRail
-            status={rail}
-            barColor={activity.color}
-            isRtl={isRtl}
-            inset={MILESTONE_OUTLINE_WIDTH + 1}
-          />
-        )}
+        {mark && <StatusMark status={mark} barColor={activity.color} isRtl={isRtl} />}
 
         {onAnchorPointerDown && (
           <>

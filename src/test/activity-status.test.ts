@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useStore } from '@/stores';
 import { normalizeChart } from '@/utils/persistence';
-import { statusFillFraction, statusFromLegacyProgress } from '@/utils/activity';
-import { railInk, withAlpha, contrastRatio, LABEL_DARK, LABEL_LIGHT } from '@/utils/color';
+import { statusDrawsRail, statusFillFraction, statusFromLegacyProgress } from '@/utils/activity';
+import { railInk, withAlpha, contrastRatio, RAIL_INK_DARK, RAIL_INK_LIGHT } from '@/utils/color';
 import {
   ROW_SIZE_MAP,
   STATUS_RAIL_BOTTOM,
@@ -20,9 +20,21 @@ describe('statusFillFraction', () => {
     expect(statusFillFraction('done')).toBe(1);
   });
 
-  it('is distinguishable without colour — the fractions are all different', () => {
-    const fractions = ACTIVITY_STATUSES.map(statusFillFraction);
-    expect(new Set(fractions).size).toBe(ACTIVITY_STATUSES.length);
+  it('gives "not relevant" no rail — it is a hatch over the whole bar', () => {
+    expect(statusFillFraction('na')).toBeNull();
+    expect(statusDrawsRail('na')).toBe(false);
+  });
+
+  it('reserves label height only for the statuses drawn as a rail', () => {
+    expect(statusDrawsRail(undefined)).toBe(false);
+    expect(statusDrawsRail('todo')).toBe(true);
+    expect(statusDrawsRail('doing')).toBe(true);
+    expect(statusDrawsRail('done')).toBe(true);
+  });
+
+  it('is distinguishable without colour — every state draws differently', () => {
+    const marks = ACTIVITY_STATUSES.map(statusFillFraction);
+    expect(new Set(marks).size).toBe(ACTIVITY_STATUSES.length);
   });
 });
 
@@ -80,23 +92,51 @@ describe('two-line label clears the rail', () => {
 });
 
 describe('rail ink', () => {
-  it('reads against every palette swatch, light fills included', () => {
+  it('always picks whichever of the two greys actually scores higher', () => {
     for (const swatch of ALL_ACTIVITY_COLORS) {
-      const ink = railInk(swatch);
-      const base = ink.fill.startsWith('rgba(255') ? LABEL_LIGHT : LABEL_DARK;
-      expect(contrastRatio(base, swatch), swatch).toBeGreaterThanOrEqual(3);
+      const chosen = railInk(swatch).ink;
+      const other = chosen === RAIL_INK_LIGHT ? RAIL_INK_DARK : RAIL_INK_LIGHT;
+      expect(contrastRatio(chosen, swatch), swatch)
+        .toBeGreaterThanOrEqual(contrastRatio(other, swatch));
     }
   });
 
-  it('flips ink with the fill rather than hardcoding one', () => {
-    expect(railInk('#fef9c3').fill).toContain('15, 23, 42');
-    expect(railInk('#1e3a8a').fill).toContain('255, 255, 255');
+  it('is a grey pair, not the label ink — no near-black on a pale bar', () => {
+    expect(railInk('#fef9c3').ink).toBe(RAIL_INK_DARK);
+    expect(railInk('#1e3a8a').ink).toBe(RAIL_INK_LIGHT);
+    expect(railInk('#14b8a6').ink).toBe(RAIL_INK_LIGHT);
   });
 
-  it('draws the track fainter than the fill', () => {
-    const { track, fill } = railInk('#14b8a6');
+  /**
+   * The chosen pair sits BELOW the 3:1 floor WCAG 1.4.11 asks of non-text UI. That is a
+   * deliberate trade for a softer mark, and this pins it: a palette change that pushes the
+   * worst case lower is a regression, not a new normal.
+   */
+  it('holds its measured worst case across the whole palette', () => {
+    let worst = Infinity;
+    let worstSwatch = '';
+    for (const swatch of ALL_ACTIVITY_COLORS) {
+      const c = contrastRatio(railInk(swatch).ink, swatch);
+      if (c < worst) {
+        worst = c;
+        worstSwatch = swatch;
+      }
+    }
+    expect(worst, `worst swatch ${worstSwatch}`).toBeGreaterThanOrEqual(1.9);
+  });
+
+  it('draws the empty track weaker than a filled one, but not faint', () => {
+    const { track, fill, ink } = railInk('#14b8a6');
     const alpha = (c: string) => Number(c.split(',').pop()!.replace(')', ''));
-    expect(alpha(track)).toBeLessThan(alpha(fill));
+    expect(alpha(track)).toBeGreaterThanOrEqual(0.4);
+    expect(alpha(track)).toBeLessThan(1);
+    expect(fill).toBe(ink);
+  });
+
+  it('gives the hatch its own weight, heavier than the track', () => {
+    const { track, hatch } = railInk('#14b8a6');
+    const alpha = (c: string) => Number(c.split(',').pop()!.replace(')', ''));
+    expect(alpha(hatch)).toBeGreaterThan(alpha(track));
   });
 });
 
@@ -140,6 +180,7 @@ describe('legacy progress migration', () => {
 
     const out = normalizeChart(raw);
     expect(out.activities.map((a) => a.status)).toEqual(['done', 'doing', undefined]);
+
     for (const a of out.activities) {
       expect(a).not.toHaveProperty('progress');
     }
@@ -200,5 +241,28 @@ describe('the global switch', () => {
     useStore.getState().restoreViewSettings(captured);
     expect(useStore.getState().showStatus).toBe(false);
     useStore.getState().setShowStatus(true);
+  });
+});
+
+describe('status validation at ingress', () => {
+  const chartWith = (status: unknown): MonthsChart => ({
+    id: 'c', unit: 'month', name: 'T',
+    startYear: 2026, startMonth: 1, endYear: 2026, endMonth: 12,
+    rows: [{ id: 'r1', name: '', order: 0, activityIds: ['a1'] }],
+    activities: [
+      { id: 'a1', name: 'A', color: '#14b8a6', startMonth: 0, durationMonths: 2, order: 0, status },
+    ],
+    dependencies: [], createdAt: 'x', updatedAt: 'x',
+  } as unknown as MonthsChart);
+
+  it('keeps every known status', () => {
+    for (const s of ACTIVITY_STATUSES) {
+      expect(normalizeChart(chartWith(s)).activities[0]!.status).toBe(s);
+    }
+  });
+
+  it('drops an unknown one rather than letting it reach the renderer', () => {
+    expect(normalizeChart(chartWith('shipped')).activities[0]!.status).toBeUndefined();
+    expect(normalizeChart(chartWith(42)).activities[0]!.status).toBeUndefined();
   });
 });
