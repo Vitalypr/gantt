@@ -20,6 +20,7 @@ type Row = {
   mergedWithNext?: boolean;
   isGroup?: boolean;
   collapsed?: boolean;
+  gapBefore?: boolean;
 };
 
 type SidebarProps = {
@@ -75,6 +76,9 @@ export function Sidebar({ rows, sidebarWidth, onResizePointerDown, onResizeStep 
                 className={cn(
                   'absolute flex items-center px-3 text-xs',
                   row.isGroup && 'bg-muted/60 font-bold',
+                  // Close the box against a topic band. Without it the band reads as padding
+                  // on top of this row rather than as a break above it.
+                  row.gapBefore && 'border-t border-border-subtle',
                   isSelected && 'bg-accent/50 text-foreground',
                   // Hide bottom border for merged leader rows (except the last in group)
                   isMergeLeader && 'border-b-0',
