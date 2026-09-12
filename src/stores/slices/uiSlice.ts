@@ -48,7 +48,6 @@ export type UiSlice = {
   chartDirection: ChartDirection;
   /** Find-in-chart query; null means the panel is closed. */
   findQuery: string | null;
-  showLegend: boolean;
   /** Master switch for every status rail on the canvas. */
   showStatus: boolean;
 
@@ -72,7 +71,6 @@ export type UiSlice = {
   setChartDirection: (direction: ChartDirection) => void;
   toggleChartDirection: () => void;
   setFindQuery: (query: string | null) => void;
-  setShowLegend: (show: boolean) => void;
   setShowStatus: (show: boolean) => void;
 };
 
@@ -92,7 +90,6 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   timelineMode: 'months' as TimelineMode,
   chartDirection: 'ltr' as ChartDirection,
   findQuery: null as string | null,
-  showLegend: false,
   showStatus: true,
 
   zoomIn: () =>
@@ -197,11 +194,6 @@ export const createUiSlice: StateCreator<UiSlice, [['zustand/immer', never]], []
   setRowSize: (size) =>
     set((state) => {
       state.rowSize = size;
-    }),
-
-  setShowLegend: (show) =>
-    set((state) => {
-      state.showLegend = show;
     }),
 
   setShowStatus: (show) =>

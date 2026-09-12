@@ -8,7 +8,6 @@ export const DEFAULT_VIEW_SETTINGS: ViewSettings = {
   showQuarters: true,
   timelineMode: undefined,
   chartDirection: undefined,
-  showLegend: undefined,
   showStatus: undefined,
 };
 
@@ -24,7 +23,6 @@ export const VIEW_SETTING_KEYS = [
   'showQuarters',
   'timelineMode',
   'chartDirection',
-  'showLegend',
   'showStatus',
 ] as const satisfies readonly (keyof ViewSettings)[];
 
@@ -65,7 +63,6 @@ export function parseViewSettings(raw: unknown): ViewSettings | undefined {
     showQuarters: bool('showQuarters', DEFAULT_VIEW_SETTINGS.showQuarters)!,
     timelineMode: v['timelineMode'] === 'weeks' ? 'weeks' : v['timelineMode'] === 'months' ? 'months' : undefined,
     chartDirection: v['chartDirection'] === 'rtl' ? 'rtl' : v['chartDirection'] === 'ltr' ? 'ltr' : undefined,
-    showLegend: bool('showLegend', undefined),
     showStatus: bool('showStatus', undefined),
   };
 }

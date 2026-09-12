@@ -64,8 +64,22 @@ describe('help manifest', () => {
 
   it('mentions the features that exist now, not the ones that were removed', () => {
     const all = HELP_SECTIONS.flatMap((s) => s.items.map((i) => `${i.label} ${i.body}`)).join(' ').toLowerCase();
-    for (const topic of ['right-to-left', 'holiday', 'marker', 'legend', 'template', 'milestone', 'progress', 'svg']) {
+    for (const topic of [
+      'right-to-left', 'holiday', 'marker', 'template', 'milestone', 'svg',
+      // Added since: the help drifts the moment a feature ships without a line here.
+      'topic', 'status', 'names column', 'tone',
+    ]) {
       expect(all, `help never mentions ${topic}`).toContain(topic);
+    }
+  });
+
+  it('does not describe features that were removed', () => {
+    const all = HELP_SECTIONS.flatMap((s) => s.items.map((i) => `${i.label} ${i.body}`)).join(' ').toLowerCase();
+    // The legend was removed from the toolbar. Help that still describes it sends someone
+    // looking for a control that is not there. (`progress` is not banned outright — "In
+    // progress" is a status name.)
+    for (const gone of ['legend', 'show legend', 'fill colour', 'frame colour']) {
+      expect(all, `help still describes ${gone}`).not.toContain(gone);
     }
   });
 });

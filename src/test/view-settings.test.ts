@@ -29,7 +29,7 @@ describe('view settings round trip', () => {
     s.setShowQuarters(false);
     s.setTimelineMode('weeks');
     s.setChartDirection('rtl');
-    s.setShowLegend(true);
+    s.setShowStatus(false);
 
     const captured = useStore.getState().captureViewSettings();
     const parsed = parseViewSettings(JSON.parse(JSON.stringify(captured)));
@@ -46,7 +46,7 @@ describe('view settings round trip', () => {
       showQuarters: false,
       timelineMode: 'weeks',
       chartDirection: 'rtl',
-      showLegend: true,
+      showStatus: false,
     };
     useStore.getState().restoreViewSettings(target);
     const s = useStore.getState();
@@ -57,7 +57,7 @@ describe('view settings round trip', () => {
     expect(s.showQuarters).toBe(false);
     expect(s.timelineMode).toBe('weeks');
     expect(s.chartDirection).toBe('rtl');
-    expect(s.showLegend).toBe(true);
+    expect(s.showStatus).toBe(false);
   });
 
   it('the parser carries every declared key', () => {

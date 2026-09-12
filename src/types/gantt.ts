@@ -88,7 +88,6 @@ export type ViewSettings = {
   showQuarters: boolean;
   timelineMode?: TimelineMode;
   chartDirection?: ChartDirection;
-  showLegend?: boolean;
   /** Master switch for the status rails. Undefined means "on". */
   showStatus?: boolean;
 };

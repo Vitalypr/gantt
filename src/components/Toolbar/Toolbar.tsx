@@ -21,7 +21,6 @@ import {
   Flag,
   MoreHorizontal,
   LayoutTemplate,
-  List,
   FileImage,
   ArrowLeftRight,
   AArrowDown,
@@ -120,10 +119,8 @@ export function Toolbar() {
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [markersDialogOpen, setMarkersDialogOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
-  const showLegend = useStore((s) => s.showLegend);
   const showStatus = useStore((s) => s.showStatus);
   const setShowStatus = useStore((s) => s.setShowStatus);
-  const setShowLegend = useStore((s) => s.setShowLegend);
   const [toast, setToast] = useState<ToastMessage>(null);
   const [snapshotting, setSnapshotting] = useState(false);
   const chartDirection = useStore((s) => s.chartDirection);
@@ -658,11 +655,6 @@ export function Toolbar() {
             <TooltipContent>More: export, import, snapshots, print</TooltipContent>
           </Tooltip>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => setShowLegend(!showLegend)}>
-              <List className="mr-2 h-3.5 w-3.5" />
-              {showLegend ? 'Hide legend' : 'Show legend'}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="my-1 h-px bg-border" />
             <DropdownMenuItem onSelect={() => setTemplateDialogOpen(true)}>
               <LayoutTemplate className="mr-2 h-3.5 w-3.5" />
               Start from a template…

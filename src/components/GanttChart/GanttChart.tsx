@@ -13,7 +13,6 @@ import { TimelineHeader } from '@/components/Timeline/TimelineHeader';
 import { TimelineGrid } from '@/components/Timeline/TimelineGrid';
 import { HolidayLayer } from '@/components/Timeline/HolidayLayer';
 import { MarkerLayer } from '@/components/Timeline/MarkerLayer';
-import { LegendPanel } from '@/components/Timeline/LegendPanel';
 import { AlignmentGuides } from '@/components/Timeline/AlignmentGuides';
 import { RollupBars } from '@/components/Timeline/RollupBars';
 import { TimelineBody } from '@/components/Timeline/TimelineBody';
@@ -307,7 +306,6 @@ export function GanttChart() {
         totalHeight={bodyHeight}
       />
 
-      <LegendPanel />
 
       {/* Empty state */}
       {!hasRows && (
