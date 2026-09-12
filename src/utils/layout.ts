@@ -121,10 +121,10 @@ export type RowBand = { rowId: string; y: number };
 /**
  * Index of the row at `y`, in timeline-body coordinates.
  *
- * Hit-tests the actual bands instead of dividing by a pitch. Row pitch stops being uniform the
- * moment anything puts empty space between rows — a topic gap, a group break — and
- * `Math.round(dy / rowHeight)` is then wrong by a growing amount for every gap crossed, which
- * shows up as a bar landing one row off, silently and only sometimes.
+ * Hit-tests the actual bands instead of dividing by a pitch. `Math.round(dy / rowHeight)`
+ * assumes every row sits at the same spacing; the moment anything puts empty space between
+ * rows it is wrong by a growing amount for every gap crossed, which shows up as a bar landing
+ * one row off, silently and only sometimes.
  *
  * A pointer inside a gap resolves to the nearer row rather than to nothing, so a drag released
  * between two blocks still commits somewhere sensible.

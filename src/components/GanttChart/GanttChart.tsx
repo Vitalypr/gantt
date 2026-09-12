@@ -1,6 +1,6 @@
 import { useRef, useMemo, useEffect, useState } from 'react';
 import { useStore } from '@/stores';
-import { ROW_SIZE_MAP, TOPIC_GAP } from '@/constants/timeline';
+import { ROW_SIZE_MAP } from '@/constants/timeline';
 import { useDoubleTap } from '@/hooks/useDoubleTap';
 import { getTotalMonths, getTotalWeeks } from '@/utils/timeline';
 import { bodyHeightFor, getHeaderHeight } from '@/utils/layout';
@@ -35,9 +35,6 @@ export type RowLayout = {
   mergedWithNext?: boolean;
   isGroup?: boolean;
   collapsed?: boolean;
-  /** A topic band sits directly above / below this row, so it closes its box on that side. */
-  gapBefore?: boolean;
-  gapAfter?: boolean;
 };
 
 export function GanttChart() {
@@ -132,41 +129,25 @@ export function GanttChart() {
     [chartRows, chartActivities],
   );
 
-  // Topic cells and the gaps between them. One resolution, shared by the layout below and by
-  // the column itself, so the rotated cell and the rows it spans cannot disagree.
+  // Topic cells, resolved once and shared with the column, so the rotated cell and the rows it
+  // spans cannot disagree.
   const topics = useMemo(() => resolveTopicBands(visibleRows), [visibleRows]);
   const rowLayout = useMemo(() => {
     const rows: RowLayout[] = [];
-    // Where the empty bands between topic blocks fall, so the canvas can paint over them.
-    const gaps: { y: number; height: number }[] = [];
     let y = 0;
     for (const row of visibleRows) {
-      // Empty canvas between topic blocks. It is not a row: nothing can be dropped in it, and
-      // it only exists once some row actually carries a topic.
-      const hasGap = topicsShown && topics.gapBefore.has(row.id);
-      if (hasGap) {
-        gaps.push({ y, height: TOPIC_GAP });
-        y += TOPIC_GAP;
-      }
       rows.push({
         rowId: row.id,
         activityIds: row.activityIds,
         y,
-        gapBefore: hasGap,
         mergedWithNext: row.mergedWithNext,
         isGroup: row.isGroup,
         collapsed: row.collapsed,
       });
       y += rowHeight;
     }
-    // The row a band opens below is the one that has to close itself on its bottom edge.
-    for (const g of gaps) {
-      const above = rows.filter((r) => r.y + rowHeight <= g.y).pop();
-      if (above) above.gapAfter = true;
-    }
-
-    return { rows, gaps, totalHeight: y };
-  }, [visibleRows, rowHeight, topics, topicsShown]);
+    return { rows, totalHeight: y };
+  }, [visibleRows, rowHeight]);
   const dragMove = useDragMove(rowLayout.rows);
   const dragRowSpan = useDragRowSpan(rowLayout.rows);
   const dragConnect = useDragConnect(rowLayout.rows, effectiveUnitWidth);
@@ -273,19 +254,6 @@ export function GanttChart() {
         endMonth={endMonth}
         timelineMode={timelineMode}
       />
-      {/* The band between topic blocks is empty canvas, not a row. Painted straight after the
-          grid so it cuts the month lines — but BEFORE the holiday, today and marker layers, so
-          everything that marks a DATE runs through it unbroken. A holiday that stopped at a
-          topic break would be telling the reader the holiday stops there. */}
-      {rowLayout.gaps.map((g) => (
-        <div
-          key={`gap-${g.y}`}
-          data-topic-gap
-          className="pointer-events-none absolute left-0 bg-background"
-          style={{ top: g.y, height: g.height, width: timelineWidth }}
-        />
-      ))}
-
       <HolidayLayer
         startYear={startYear}
         startMonth={startMonth}

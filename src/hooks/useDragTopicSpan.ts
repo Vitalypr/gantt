@@ -87,7 +87,7 @@ export function useDragTopicSpan(rows: Row[]) {
         apply(null);
         isDraggingRef.current = false;
         // Commit from what the preview last SHOWED, not from the pointerup position — the two
-        // can disagree by a row when the release lands inside a topic gap.
+        // can disagree by a row when the release lands on a band edge.
         if (!last) return;
         const leader = rowsRef.current[last.startIndex];
         if (leader) setTopicSpan(leader.rowId, last.span);

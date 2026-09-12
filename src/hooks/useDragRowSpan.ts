@@ -66,8 +66,9 @@ export function useDragRowSpan(rows: RowLayout[]) {
           });
         }
 
-        // From the rendered bands, not a pitch: a topic gap makes the pitch non-uniform and
-        // `deltaY / rh` then over-counts a row for every gap the pointer crosses.
+        // From the rendered bands, not a pitch: `deltaY / rh` assumes every row sits at the
+        // same spacing, and over-counts a row for every gap the pointer crosses if one ever
+        // does.
         const hit = rowIndexAtY(sortedRows, rh, moveEvent.clientY - bodyTop);
         const rowDelta = hit >= 0 && rowIndex >= 0 ? hit - rowIndex : Math.round(deltaY / rh);
 

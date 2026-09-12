@@ -100,10 +100,10 @@ export function useDragMove(rows: { rowId: string; y: number }[]) {
         );
         let rowOffset = 0;
         if (fromRowIndex >= 0) {
-          // Hit-test the rendered bands rather than dividing by a pitch. Topic gaps make the
-          // pitch non-uniform, and `Math.round(dy / rowHeight)` is then wrong by a growing
-          // amount for every gap crossed. Hit-testing is also what makes a collapsed group
-          // behave: the visible rows are the ones the pointer can actually be over.
+          // Hit-test the rendered bands rather than dividing by a pitch. The visible rows are
+          // the ones the pointer can actually be over, which is what makes a collapsed group
+          // behave — and it stays correct if anything ever puts space between rows again,
+          // where `Math.round(dy / rowHeight)` would drift by a row per gap crossed.
           const bands = rowsRef.current;
           const hit = rowIndexAtY(bands, rowHeight, clientY - bodyTop);
           const targetRowId = hit >= 0 ? bands[hit]?.rowId : undefined;

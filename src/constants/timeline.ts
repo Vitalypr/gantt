@@ -34,9 +34,6 @@ export const DEFAULT_TOPIC_WIDTH = 34;
 export const MIN_TOPIC_WIDTH = 20;
 export const MAX_TOPIC_WIDTH = 120;
 
-/** Empty canvas between one topic block and the next. Not a row: nothing lands in it. */
-export const TOPIC_GAP = 10;
-
 export const DEFAULT_SIDEBAR_WIDTH = 240;
 export const MIN_SIDEBAR_WIDTH = 60;
 export const MAX_SIDEBAR_WIDTH = 400;

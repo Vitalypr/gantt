@@ -58,61 +58,6 @@ describe('resolveTopicBands', () => {
   });
 });
 
-describe('gaps between topics', () => {
-  const ids = (rows: GanttRow[]) => [...resolveTopicBands(rows).gapBefore];
-
-  it('puts no gap in a chart with no topics at all', () => {
-    expect(ids([row('a'), row('b'), row('c')])).toEqual([]);
-  });
-
-  it('never puts a gap above the first row', () => {
-    const rows = [row('a', { topic: 'Design' }), row('b', { topic: 'Build' })];
-    expect(ids(rows)).not.toContain('a');
-  });
-
-  it('separates two adjacent topics', () => {
-    const rows = [
-      row('a', { topic: 'Design', topicMergedWithNext: true }),
-      row('b'),
-      row('c', { topic: 'Build' }),
-    ];
-    expect(ids(rows)).toEqual(['c']);
-  });
-
-  it('does not break a topic in the middle of its own run', () => {
-    const rows = [
-      row('a', { topic: 'Design', topicMergedWithNext: true }),
-      row('b', { topicMergedWithNext: true }),
-      row('c', { topicMergedWithNext: true }),
-      row('d'),
-    ];
-    expect(ids(rows)).toEqual([]);
-  });
-
-  it('brackets an untopiced row sitting between two topics', () => {
-    const rows = [
-      row('a', { topic: 'Design' }),
-      row('b'),
-      row('c', { topic: 'Build' }),
-    ];
-    expect(ids(rows)).toEqual(['b', 'c']);
-  });
-
-  it('separates plain rows from a topic that follows them', () => {
-    const rows = [row('a'), row('b'), row('c', { topic: 'Build' })];
-    expect(ids(rows)).toEqual(['c']);
-  });
-
-  it('adds one gap per boundary, never two for the same row', () => {
-    const rows = [
-      row('a', { topic: 'A' }),
-      row('b', { topic: 'B' }),
-      row('c', { topic: 'C' }),
-    ];
-    expect(ids(rows)).toEqual(['b', 'c']);
-  });
-});
-
 describe('hasAnyTopic', () => {
   it('is false for an untouched chart, so the column stays hidden', () => {
     expect(hasAnyTopic([row('a'), row('b')])).toBe(false);
