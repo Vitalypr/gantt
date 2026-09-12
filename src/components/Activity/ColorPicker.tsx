@@ -44,7 +44,11 @@ export function ColorPicker({ targets, activeIndex, onActiveIndexChange }: Color
             <button
               key={t.label}
               className={cn(
-                'flex-1 rounded-sm px-2 py-1 text-[11px] leading-none transition-colors',
+                // A flex row, not inline content: the label and its dot were laid out as
+                // inline boxes, so the widest label — "Frame" — pushed its dot onto a second
+                // line and it sat under the word instead of beside it.
+                'flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap',
+                'rounded-sm px-2 py-1 text-[11px] leading-none transition-colors',
                 i === activeIndex
                   ? 'bg-background font-medium shadow-sm'
                   : 'text-muted-foreground hover:text-foreground',
@@ -56,7 +60,7 @@ export function ColorPicker({ targets, activeIndex, onActiveIndexChange }: Color
               {/* The dot is what makes one grid serving two targets legible: each tab shows
                   what it currently holds without switching to it. */}
               <span
-                className="ml-1.5 inline-block h-2 w-2 rounded-full border border-border align-middle"
+                className="h-2 w-2 shrink-0 rounded-full border border-border"
                 style={{ backgroundColor: t.current ?? 'transparent' }}
               />
             </button>
