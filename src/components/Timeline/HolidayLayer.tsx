@@ -27,6 +27,15 @@ type HolidayLayerProps = {
  * as chart corruption rather than information. A day is legible as a seventh of a week
  * column, which is the granularity this was asked for.
  *
+ * Each band is labelled with the holiday's Hebrew name, set sideways at the top of the band.
+ * The label reads top-to-bottom because it is anchored at the top — the first letter should be
+ * where the eye starts. It is deliberately allowed to overhang: a one-day holiday is a seventh
+ * of a week column, about 5.7px at the default zoom, so an 8px label cannot fit inside it. The
+ * text sits on its own dark backing strip. White on the band alone measures about 1.5:1 in the
+ * LIGHT theme — the band is a 50%-alpha red over a near-white canvas, so it composites to a
+ * pale pink — and a text-shadow was not enough at 8px. The strip fixes the contrast in both
+ * themes without changing the band colour or the white the label was asked for.
+ *
  * Behind the bars and `pointer-events: none`, so it can never swallow a click; and it lives
  * inside `[data-gantt-grid]`, so it ships in the exported image like everything else there.
  */
@@ -74,7 +83,27 @@ export function HolidayLayer({
             width: b.span * unitWidth,
             height: totalHeight,
           }}
-        />
+        >
+          <span
+            data-holiday-label
+            dir="rtl"
+            className="absolute left-1/2 top-1 whitespace-nowrap rounded-sm px-[1px] py-1 text-[8px] font-semibold leading-none"
+            style={{
+              // Flipped 180° from the default `vertical-rl`, so the glyphs face the other way.
+              // `top` anchoring plus the flip is what keeps the label at the head of the band.
+              writingMode: 'vertical-rl',
+              transform: 'translateX(-50%) rotate(180deg)',
+              transformOrigin: 'center',
+              color: '#ffffff',
+              backgroundColor: 'rgba(15, 23, 42, 0.6)',
+              // A long name on a short chart would otherwise run past the last row.
+              maxHeight: Math.max(0, totalHeight - 8),
+              overflow: 'hidden',
+            }}
+          >
+            {b.nameHe}
+          </span>
+        </div>
       ))}
     </div>
   );
