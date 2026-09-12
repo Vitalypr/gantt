@@ -40,7 +40,7 @@ export function TopicColumn({ rows, cells, width, totalHeight }: TopicColumnProp
   }
 
   return (
-    <div className="relative bg-muted/20" style={{ width, height: totalHeight }}>
+    <div className="relative" style={{ width, height: totalHeight }}>
       {cells.map((cell) => {
         const first = indexOf.get(cell.leaderRowId);
         if (first === undefined) return null;
@@ -120,7 +120,7 @@ export function TopicColumn({ rows, cells, width, totalHeight }: TopicColumnProp
           data-row-id={r.rowId}
           className={cn(
             'absolute inset-x-0 flex cursor-text items-center justify-center',
-            'border-y border-dashed border-border-subtle text-[11px] leading-none',
+            'border-y border-dashed border-border-subtle bg-muted/20 text-[11px] leading-none',
             // Visible at rest, not on hover. An empty slot that only appears under the cursor
             // makes a switched-on column look like an empty strip with nothing in it.
             'text-muted-foreground/70 transition-colors hover:bg-muted/40 hover:text-foreground',

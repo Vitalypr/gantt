@@ -134,11 +134,16 @@ export function GanttChart() {
   const topics = useMemo(() => resolveTopicBands(visibleRows), [visibleRows]);
   const rowLayout = useMemo(() => {
     const rows: RowLayout[] = [];
+    // Where the empty bands between topic blocks fall, so the canvas can paint over them.
+    const gaps: { y: number; height: number }[] = [];
     let y = 0;
     for (const row of visibleRows) {
       // Empty canvas between topic blocks. It is not a row: nothing can be dropped in it, and
       // it only exists once some row actually carries a topic.
-      if (topicsShown && topics.gapBefore.has(row.id)) y += TOPIC_GAP;
+      if (topicsShown && topics.gapBefore.has(row.id)) {
+        gaps.push({ y, height: TOPIC_GAP });
+        y += TOPIC_GAP;
+      }
       rows.push({
         rowId: row.id,
         activityIds: row.activityIds,
@@ -149,7 +154,7 @@ export function GanttChart() {
       });
       y += rowHeight;
     }
-    return { rows, totalHeight: y };
+    return { rows, gaps, totalHeight: y };
   }, [visibleRows, rowHeight, topics, topicsShown]);
   const dragMove = useDragMove(rowLayout.rows);
   const dragRowSpan = useDragRowSpan(rowLayout.rows);
@@ -283,6 +288,18 @@ export function GanttChart() {
         totalHeight={bodyHeight}
         timelineMode={timelineMode}
       />
+      {/* The band between topic blocks is empty canvas, not a row. It is painted here rather
+          than left as a hole because the month grid draws from 0 to the full body height and
+          would otherwise run straight through it — the separation has to cut everything. */}
+      {rowLayout.gaps.map((g) => (
+        <div
+          key={`gap-${g.y}`}
+          data-topic-gap
+          className="pointer-events-none absolute left-0 bg-background"
+          style={{ top: g.y, height: g.height, width: timelineWidth }}
+        />
+      ))}
+
       <TimelineBody
         rows={rowLayout.rows}
         monthWidth={effectiveUnitWidth}
