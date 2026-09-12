@@ -1,12 +1,14 @@
 # Handoff
 
-_Updated 2026-09-12 · branch `feat/rtl-hebrew-holidays-and-roadmap` · pushed at `e59c070`_
+_Updated 2026-09-12 · branch `main` · pushed at `b112e55`_
 
 ## State
 
 All gates green: `tsc -b` 0 · `pnpm lint` **0 errors** (20 warnings) · `pnpm test` **163
 passing** · `pnpm test:e2e` **47 passing** (30 parked) · `pnpm build` and `pnpm build:single`
-both succeed. Verified on a clean Linux checkout of `ed9dfc1`, not just on the dev box.
+both succeed. `tsc`, `lint`, `test`, `build` and `build:single` re-run on the dev box at
+`b112e55`, the merged tip; the E2E figure is from `ed9dfc1`, verified on a clean Linux
+checkout and not re-run since.
 
 `docs/TASKS.md` is the task register and `docs/improvement-roadmap.md` the defect register.
 **Both are currently empty of open items.** Every roadmap entry is ✅ and verified present in
@@ -43,8 +45,6 @@ kept recurring.
 
 ## Open threads
 
-- **The branch is not merged.** `feat/rtl-hebrew-holidays-and-roadmap` is pushed and tracking
-  `origin/`, but `origin/main` is still at `c4e4054`. Opening the PR is the remaining step.
 - **`e2e/features.spec.ts` and `gestures.spec.ts` are parked** (`describe.skip`) with a banner
   saying why: they need a `window.__ganttStore` test hook that was lost. Much of what they
   describe now exists, so they are worth reviving behind that hook.
