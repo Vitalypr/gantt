@@ -1,14 +1,17 @@
 # Handoff
 
-_Updated 2026-09-12 · branch `main` · pushed at `322b1a3`, working tree has uncommitted UI work_
+_Updated 2026-09-12 · branch `main` · pushed at `0fc653c` and deployed to gh-pages_
 
 ## State
 
 All gates green: `tsc -b` 0 · `pnpm lint` **0 errors** (20 warnings) · `pnpm test` **201
 passing** · `pnpm test:e2e` **47 passing** (30 parked) · `pnpm build` and `pnpm build:single`
-both succeed. `tsc`, `lint`, `test`, `build` and `build:single` re-run on the dev box at
-`b112e55`, the merged tip; the E2E figure is from `ed9dfc1`, verified on a clean Linux
-checkout and not re-run since.
+both succeed, all re-run on the dev box at `0fc653c`. The E2E figure is from `ed9dfc1`,
+verified on a clean Linux checkout and not re-run since.
+
+`main` is the only source branch — `gh-pages` holds built output and nothing else. The live
+site at https://vitalypr.github.io/gantt/ serves `0fc653c`; a `gh-pages` push is not the same
+as a live site, because GitHub runs a build in between that takes ~20s.
 
 `docs/TASKS.md` is the task register and `docs/improvement-roadmap.md` the defect register.
 **Both are currently empty of open items.** Every roadmap entry is ✅ and verified present in
