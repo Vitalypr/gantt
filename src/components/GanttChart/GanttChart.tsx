@@ -176,11 +176,14 @@ export function GanttChart() {
   const cornerCell = (
     <div
       key="corner"
-      className={cn(
-        'sticky top-0 z-30 border-b bg-background',
-        isRtl ? 'right-0 border-l' : 'left-0 border-r',
-      )}
-      style={{ width: sidebarWidth, height: headerHeight }}
+      className={cn('sticky top-0 z-30 border-b bg-background', isRtl ? 'border-l' : 'border-r')}
+      style={{
+        width: sidebarWidth,
+        height: headerHeight,
+        // Offset by the topic track. Sticking both to 0 stacks them: the topic column would
+        // cover the sidebar's outer edge rather than sit beside it.
+        [isRtl ? 'right' : 'left']: leadingWidth,
+      }}
     />
   );
 
@@ -202,10 +205,8 @@ export function GanttChart() {
   const sidebarCell = (
     <div
       key="sidebar"
-      className={cn(
-        'sticky z-10 bg-background',
-        isRtl ? 'right-0 border-l' : 'left-0 border-r',
-      )}
+      className={cn('sticky z-10 bg-background', isRtl ? 'border-l' : 'border-r')}
+      style={{ [isRtl ? 'right' : 'left']: leadingWidth }}
       onDoubleClick={(e) => {
         // Double-click on empty sidebar area adds a new row
         if (!(e.target as HTMLElement).closest('[data-sidebar-row]')) {
