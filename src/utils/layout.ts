@@ -28,6 +28,15 @@ export function bodyHeightFor(totalRowHeight: number): number {
 /** Height of one header tier. */
 export const TIER_HEIGHT = 28;
 
+/**
+ * The week tier is taller: it carries the week number AND the dates that week covers, on two
+ * lines. A tier height depends on the mode and the toggles only, never on unit width — unit
+ * width comes from a ResizeObserver, and a width-dependent tier height would reflow the whole
+ * chart mid-drag. What the width DOES decide is how much of the date range is printed, which
+ * `weekRangeForWidth` handles without changing any geometry.
+ */
+export const WEEK_TIER_HEIGHT = 40;
+
 export type HeaderTierHeights = {
   /** Year band. */
   top: number;
@@ -54,7 +63,7 @@ export function getHeaderTierHeights(
 ): HeaderTierHeights {
   // Weeks mode is always Year / Month / Week. Months mode is Year / [Quarter] / Month.
   if (mode === 'weeks') {
-    return { top: TIER_HEIGHT, middle: TIER_HEIGHT, unit: TIER_HEIGHT };
+    return { top: TIER_HEIGHT, middle: TIER_HEIGHT, unit: WEEK_TIER_HEIGHT };
   }
   return showQuarters
     ? { top: TIER_HEIGHT, middle: TIER_HEIGHT, unit: TIER_HEIGHT }

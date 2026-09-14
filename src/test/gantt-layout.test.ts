@@ -6,6 +6,7 @@ import {
   TIER_HEIGHT,
   bodyHeightFor,
   getHeaderHeight,
+  WEEK_TIER_HEIGHT,
   getHeaderTierHeights,
 } from '@/utils/layout';
 
@@ -65,9 +66,15 @@ describe('getHeaderHeight', () => {
 
   it('weeks mode always has three tiers — Year / Month / Week', () => {
     for (const q of [true, false]) {
+      expect(getHeaderTierHeights('weeks', q).top).toBe(TIER_HEIGHT);
       expect(getHeaderTierHeights('weeks', q).middle).toBe(TIER_HEIGHT);
-      expect(getHeaderHeight('weeks', q)).toBe(TIER_HEIGHT * 3);
+      expect(getHeaderHeight('weeks', q)).toBe(TIER_HEIGHT * 2 + WEEK_TIER_HEIGHT);
     }
+  });
+
+  it('gives the week tier extra height, because it carries a second line of dates', () => {
+    expect(getHeaderTierHeights('weeks', true).unit).toBe(WEEK_TIER_HEIGHT);
+    expect(WEEK_TIER_HEIGHT).toBeGreaterThan(TIER_HEIGHT);
   });
 
   it('months mode drops the middle tier when quarters are hidden', () => {

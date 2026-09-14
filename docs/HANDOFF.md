@@ -1,17 +1,17 @@
 # Handoff
 
-_Updated 2026-09-12 · branch `main` · deployed to gh-pages_
+_Updated 2026-09-14 · branch `main` · deployed to gh-pages_
 
 ## State
 
-All gates green: `tsc -b` 0 · `pnpm lint` **0 errors** (20 warnings) · `pnpm test` **201
+All gates green: `tsc -b` 0 · `pnpm lint` **0 errors** (19 warnings) · `pnpm test` **301
 passing** · `pnpm test:e2e` **47 passing** (30 parked) · `pnpm build` and `pnpm build:single`
-both succeed, all re-run on the dev box at `0fc653c`. The E2E figure is from `ed9dfc1`,
+both succeed, all re-run on the dev box at `8b61dc9`. The E2E figure is from `ed9dfc1`,
 verified on a clean Linux checkout and not re-run since.
 
 `main` is the only source branch — `gh-pages` holds built output and nothing else. The live
-site at https://vitalypr.github.io/gantt/ serves `0fc653c`; a `gh-pages` push is not the same
-as a live site, because GitHub runs a build in between that takes ~20s.
+site at https://vitalypr.github.io/gantt/ serves the latest `main`; a `gh-pages` push is
+not the same as a live site, because GitHub runs a build in between that takes ~20s.
 
 `docs/TASKS.md` is the task register and `docs/improvement-roadmap.md` the defect register.
 **Both are currently empty of open items.** Every roadmap entry is ✅ and verified present in
@@ -50,7 +50,15 @@ kept recurring.
   while the header labelled it with an ISO week number, so a holiday that really straddles a
   week — Rosh Hashanah on a Saturday and Sunday — sat inside one column. Changing the anchor
   moves every weeks-mode bar's real date by up to six days; the bucket index is unchanged, so
-  existing charts keep their shape and shift in the calendar.
+  existing charts keep their shape and shift in the calendar. The week header prints that
+  Sunday..Saturday range under the week number, which means the anchor is now visible to the
+  user: if the dates under W1 do not start on a Sunday, `getChartWeekStart` is wrong.
+- **Header tier heights are constants, never derived from the unit width.** `TIER_HEIGHT` is
+  28 and the weeks-mode unit tier is `WEEK_TIER_HEIGHT` 40, because it carries two lines. The
+  date line degrades by width through one ladder, `weekRangeForWidth` in `utils/i18n.ts`
+  (`dd.mm-dd.mm` -> `dd-dd.mm` within a month -> `dd.mm` -> nothing); the 40px step is the
+  DEFAULT zoom, so a change there is a change to what every user sees first. `title` always
+  holds the full range.
 - **`utils/layout.ts` owns the width arithmetic the sidebar drag and fit-to-view share.**
   `fitUnitWidth` divides the space beside the sidebar by the unit count; `sidebarWidthFromDrag`
   turns a pointer delta into a width. Both are RTL-aware by construction and unit-tested —

@@ -89,3 +89,32 @@ export function weekLabelForWidth(locale: string, weekNumber: number, width: num
   if (width >= 14) return String(weekNumber);
   return '';
 }
+
+/** `dd.mm` — day and month, zero padded, which is how a date is written on a plan here. */
+function dayDotMonth(date: Date): string {
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  return `${dd}.${mm}`;
+}
+
+/**
+ * The week's date range, degraded to what the column can hold.
+ *
+ * Same ladder as the week number above it: the full range, then a compact form that drops the
+ * repeated month when both ends share one, then the start date alone, then nothing. A column
+ * at the default 40px cannot hold `dd.mm-dd.mm`, and a clipped date is worse than a short one.
+ */
+export function weekRangeForWidth(start: Date, end: Date, width: number): string {
+  const sameMonth = start.getMonth() === end.getMonth();
+  const full = `${dayDotMonth(start)}–${dayDotMonth(end)}`;
+  const compact = sameMonth
+    ? `${String(start.getDate()).padStart(2, '0')}–${dayDotMonth(end)}`
+    : full;
+
+  // 40 is the DEFAULT week width, so the compact form has to fit there or the common case
+  // never shows both ends. `dd-dd.mm` is eight tabular glyphs at 8px, measured at 38px wide.
+  if (width >= 62) return full;
+  if (width >= 40 && sameMonth) return compact;
+  if (width >= 30) return dayDotMonth(start);
+  return '';
+}

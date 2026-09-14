@@ -8,8 +8,9 @@ import {
   buildYearHeadersForWeeks,
 } from '@/utils/timeline';
 import type { TimelineMode } from '@/types/gantt';
-import { TIER_HEIGHT, getHeaderHeight } from '@/utils/layout';
-import { monthLabel, monthLong, quarterLabel, quarterLabelForWidth, weekLabel, weekLabelForWidth } from '@/utils/i18n';
+import { TIER_HEIGHT, WEEK_TIER_HEIGHT, getHeaderHeight } from '@/utils/layout';
+import { monthLabel, monthLong, quarterLabel, quarterLabelForWidth, weekLabel, weekLabelForWidth, weekRangeForWidth } from '@/utils/i18n';
+import { cn } from '@/lib/utils';
 import { useChartDirection } from '@/hooks/useChartDirection';
 
 type TimelineHeaderProps = {
@@ -65,6 +66,7 @@ export function TimelineHeader({
     () => buildYearHeadersForWeeks(startYear, endYear, chartStartMonth, chartEndMonth),
     [startYear, endYear, chartStartMonth, chartEndMonth],
   );
+  const weekTierHeight = WEEK_TIER_HEIGHT;
   const weekHeaders = useMemo(
     () => buildWeekHeaders(startYear, endYear, chartStartMonth, chartEndMonth),
     [startYear, endYear, chartStartMonth, chartEndMonth],
@@ -113,17 +115,26 @@ export function TimelineHeader({
           })}
         </div>
 
-        <div className="flex" style={{ height: TIER_HEIGHT, flexDirection: flow }}>
-          {weekHeaders.map((wh) => (
-            <div
-              key={wh.weekIndex}
-              className={unitCell}
-              style={{ width: unitWidth, height: TIER_HEIGHT }}
-              title={weekLabel(locale, wh.weekNumber)}
-            >
-              {weekLabelForWidth(locale, wh.weekNumber, unitWidth)}
-            </div>
-          ))}
+        <div className="flex" style={{ height: weekTierHeight, flexDirection: flow }}>
+          {weekHeaders.map((wh) => {
+            const range = weekRangeForWidth(wh.start, wh.end, unitWidth);
+            return (
+              <div
+                key={wh.weekIndex}
+                className={cn(unitCell, 'flex-col justify-center gap-[1px] leading-none')}
+                style={{ width: unitWidth, height: weekTierHeight }}
+                // The full range in the tooltip, whatever the column had room to print.
+                title={`${weekLabel(locale, wh.weekNumber)} · ${weekRangeForWidth(wh.start, wh.end, Infinity)}`}
+              >
+                <span>{weekLabelForWidth(locale, wh.weekNumber, unitWidth)}</span>
+                {range && (
+                  <span className="text-[8px] font-normal tabular-nums text-muted-foreground">
+                    {range}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );

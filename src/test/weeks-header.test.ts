@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { weekRangeForWidth } from '@/utils/i18n';
 import {
   buildMonthHeadersForWeeks,
   buildWeekHeaders,
@@ -115,5 +116,48 @@ describe('week buckets start on Sunday', () => {
     const colSat = Math.floor(dateToUnitOffset(sat, 2026, 1, 'weeks'));
     const colSun = Math.floor(dateToUnitOffset(sun, 2026, 1, 'weeks'));
     expect(colSun).toBe(colSat + 1);
+  });
+});
+
+/**
+ * Every week column carries the days it covers under its number. The range degrades by the
+ * width available — a clipped date is worse than a short one — and the ladder is asserted
+ * here so a narrower default zoom cannot silently start printing half a date.
+ */
+describe('week date range', () => {
+  const sunday = new Date(2026, 8, 6); // Sun 6 Sep 2026
+  const saturday = new Date(2026, 8, 12); // Sat 12 Sep
+  const crossesMonth = { start: new Date(2026, 8, 27), end: new Date(2026, 9, 3) };
+
+  it('prints both ends when the column is wide', () => {
+    expect(weekRangeForWidth(sunday, saturday, 80)).toBe('06.09–12.09');
+  });
+
+  it('drops the repeated month at the default zoom of 40', () => {
+    expect(weekRangeForWidth(sunday, saturday, 40)).toBe('06–12.09');
+  });
+
+  it('keeps both months when the week crosses one, or falls back rather than lying', () => {
+    expect(weekRangeForWidth(crossesMonth.start, crossesMonth.end, 80)).toBe('27.09–03.10');
+    // No room for both, and "27–03.10" would read as September — so print the start only.
+    expect(weekRangeForWidth(crossesMonth.start, crossesMonth.end, 40)).toBe('27.09');
+  });
+
+  it('falls back to the start date, then to nothing', () => {
+    expect(weekRangeForWidth(sunday, saturday, 30)).toBe('06.09');
+    expect(weekRangeForWidth(sunday, saturday, 20)).toBe('');
+  });
+
+  it('zero pads both parts, so the column stays the same width all year', () => {
+    const jan = new Date(2026, 0, 4);
+    expect(weekRangeForWidth(jan, new Date(2026, 0, 10), 80)).toBe('04.01–10.01');
+  });
+
+  it('gives every header the Sunday it starts on and the Saturday it ends on', () => {
+    for (const h of buildWeekHeaders(2026, 2026, 1, 12)) {
+      expect(h.start.getDay(), `week ${h.weekIndex} starts on day ${h.start.getDay()}`).toBe(0);
+      expect(h.end.getDay(), `week ${h.weekIndex} ends on day ${h.end.getDay()}`).toBe(6);
+      expect(Math.round((h.end.getTime() - h.start.getTime()) / 86400000)).toBe(6);
+    }
   });
 });

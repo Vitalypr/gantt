@@ -224,7 +224,14 @@ export function getTotalWeeks(startYear: number, endYear: number, startMonth = 1
 }
 
 export type WeekMonthHeader = { year: number; month: number; startWeek: number; spanWeeks: number };
-export type WeekHeader = { weekNumber: number; weekIndex: number };
+export type WeekHeader = {
+  weekNumber: number;
+  weekIndex: number;
+  /** First civil day of the column — a Sunday, since that is where a column starts. */
+  start: Date;
+  /** Last civil day, six days later. Inclusive, so it is the Saturday shown to the reader. */
+  end: Date;
+};
 
 /**
  * Build month headers for weeks mode (top tier).
@@ -284,7 +291,12 @@ export function buildWeekHeaders(startYear: number, endYear: number, startMonth 
   const headers: WeekHeader[] = [];
   for (let i = 0; i < total; i++) {
     const weekDate = addDays(chartStart, i * 7);
-    headers.push({ weekNumber: getISOWeekNumber(weekDate), weekIndex: i });
+    headers.push({
+      weekNumber: getISOWeekNumber(weekDate),
+      weekIndex: i,
+      start: weekDate,
+      end: addDays(weekDate, 6),
+    });
   }
   return headers;
 }
